@@ -1,0 +1,109 @@
+/* DataTable Component Styles */
+.data-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table__header {
+  display: flex;
+  background: rgba(243, 244, 246, 0.8);
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.data-table__th {
+  flex: 1;
+  padding: 1rem;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.data-table__th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.data-table__th.sortable:hover {
+  color: #374151;
+}
+
+.sort-icon {
+  display: inline-flex;
+}
+
+.data-table__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.data-table__row {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.15s ease;
+}
+
+.data-table__row:hover {
+  background: rgba(243, 244, 246, 0.5);
+}
+
+.data-table__row.clickable {
+  cursor: pointer;
+}
+
+.data-table__td {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.data-table__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.data-table__pagination {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+}
+
+.action-btn:hover {
+  background: #f3f4f6;
+}
+
+.action-btn.edit {
+  color: #3b82f6;
+}
+
+.action-btn.delete {
+  color: #ef4444;
+}
+
+.action-btn.view {
+  color: #6b7280;
+}

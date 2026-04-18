@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Fragrance perfume placeholder">
+  <rect width="800" height="600" fill="#f6f3ff"/>
+  <rect x="300" y="190" width="200" height="250" rx="24" fill="#ffffff" stroke="#d8ceff" stroke-width="8"/>
+  <rect x="360" y="120" width="80" height="70" rx="10" fill="#d9d0ff"/>
+  <rect x="345" y="95" width="110" height="25" rx="8" fill="#b9a8ff"/>
+  <text x="400" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="38" fill="#6f55cb">FRAGRANCE</text>
+  <text x="400" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#8a74da">Perfume</text>
+</svg>

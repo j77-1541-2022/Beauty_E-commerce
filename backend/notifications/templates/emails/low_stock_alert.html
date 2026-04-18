@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Low Stock Alert - Glow Beyond Beauty</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
+        .container { max-width: 700px; margin: 0 auto; background: #ffffff; }
+        .header { background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%); padding: 40px 30px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 28px; }
+        .header p { color: rgba(255,255,255,0.9); margin: 10px 0 0; }
+        .content { padding: 40px 30px; }
+        .alert-box { background: #fef2f2; border: 2px solid #fecaca; border-radius: 12px; padding: 25px; margin-bottom: 30px; }
+        .alert-box h2 { color: #dc2626; margin: 0 0 10px; font-size: 20px; }
+        .alert-box p { color: #7f1d1d; margin: 0; }
+        .stock-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .stock-table th { background: #f3f4f6; color: #374151; padding: 15px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+        .stock-table td { padding: 15px; border-bottom: 1px solid #e5e7eb; color: #4b5563; }
+        .stock-table tr:hover { background: #f9fafb; }
+        .stock-low { color: #dc2626; font-weight: 600; }
+        .recommendation { background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: 600; margin: 20px 0; }
+        .footer { background: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Low Stock Alert</h1>
+            <p>Inventory action required</p>
+        </div>
+        
+        <div class="content">
+            <div class="alert-box">
+                <h2>🚨 Restock Required</h2>
+                <p>The following products are below their recommended reorder level and require immediate attention.</p>
+            </div>
+            
+            <table class="stock-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>SKU</th>
+                        <th>Current Stock</th>
+                        <th>Reorder Level</th>
+                        <th>Recommended Order</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td><strong>{{ product.name }}</strong></td>
+                        <td>{{ product.sku }}</td>
+                        <td class="stock-low">{{ product.current_stock }}</td>
+                        <td>{{ product.reorder_level }}</td>
+                        <td><span class="recommendation">+{{ product.recommended_order }} units</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <center>
+                <a href="{{ admin_url }}/admin/inventory/inventoryitem/" class="btn">Manage Inventory</a>
+            </center>
+        </div>
+        
+        <div class="footer">
+            <p>This alert was generated automatically by the Glow Beyond Beauty inventory system.</p>
+            <p style="margin-top: 10px; font-size: 12px;">Generated on {{ generated_at }}</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Update - Glow Beyond Beauty</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+        .header { background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #3b82f6 100%); padding: 40px 30px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 28px; }
+        .content { padding: 40px 30px; }
+        .status-box { background: #f0fdf4; border: 2px solid #86efac; border-radius: 12px; padding: 30px; text-align: center; margin-bottom: 30px; }
+        .status-box.processing { background: #eff6ff; border-color: #93c5fd; }
+        .status-box.shipped { background: #fef3c7; border-color: #fcd34d; }
+        .status-box.delivered { background: #f0fdf4; border-color: #86efac; }
+        .status-icon { font-size: 48px; margin-bottom: 15px; }
+        .status-title { color: #166534; font-size: 24px; font-weight: 600; margin: 0; }
+        .status-box.processing .status-title { color: #1e40af; }
+        .status-box.shipped .status-title { color: #92400e; }
+        .progress-bar { display: flex; justify-content: space-between; margin: 30px 0; position: relative; }
+        .progress-bar::before { content: ''; position: absolute; top: 15px; left: 10%; right: 10%; height: 4px; background: #e5e7eb; z-index: 1; }
+        .progress-bar::after { content: ''; position: absolute; top: 15px; left: 10%; height: 4px; background: linear-gradient(90deg, #ec4899, #a855f7); z-index: 1; width: {{ progress_width }}%; }
+        .step { text-align: center; z-index: 2; }
+        .step-circle { width: 34px; height: 34px; border-radius: 50%; background: #e5e7eb; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 14px; }
+        .step.active .step-circle { background: linear-gradient(135deg, #ec4899, #a855f7); color: white; }
+        .step.completed .step-circle { background: #10b981; color: white; }
+        .step-label { font-size: 12px; color: #6b7280; }
+        .step.active .step-label { color: #1f2937; font-weight: 600; }
+        .delivery-estimate { background: #fef3c7; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
+        .delivery-estimate h4 { margin: 0 0 10px; color: #92400e; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: 600; }
+        .footer { background: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Glow Beyond Beauty ✨</h1>
+        </div>
+        
+        <div class="content">
+            <div class="status-box {{ status_class }}">
+                <div class="status-icon">{{ status_icon }}</div>
+                <h2 class="status-title">Order {{ status }}</h2>
+                <p style="color: #6b7280; margin: 10px 0 0;">Order #{{ order_number }}</p>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="step {% if status == 'confirmed' %}active{% else %}completed{% endif %}">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">Confirmed</div>
+                </div>
+                <div class="step {% if status == 'processing' %}active{% elif status != 'confirmed' %}completed{% endif %}">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">Processing</div>
+                </div>
+                <div class="step {% if status == 'shipped' %}active{% elif status == 'delivered' %}completed{% endif %}">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Shipped</div>
+                </div>
+                <div class="step {% if status == 'delivered' %}active{% endif %}">
+                    <div class="step-circle">4</div>
+                    <div class="step-label">Delivered</div>
+                </div>
+            </div>
+            
+            {% if estimated_delivery %}
+            <div class="delivery-estimate">
+                <h4>📦 Estimated Delivery</h4>
+                <p style="color: #78350f; margin: 0; font-size: 18px; font-weight: 600;">{{ estimated_delivery }}</p>
+            </div>
+            {% endif %}
+            
+            <center>
+                <a href="{{ frontend_url }}/orders/{{ order_id }}" class="btn">View Order Details</a>
+            </center>
+        </div>
+        
+        <div class="footer">
+            <p>Questions about your order? Contact <a href="mailto:support@glowbeyond.com" style="color: #ec4899;">support@glowbeyond.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Beauty tools brush placeholder">
+  <rect width="800" height="600" fill="#f2f7ff"/>
+  <ellipse cx="350" cy="190" rx="85" ry="55" fill="#c8daf7"/>
+  <rect x="320" y="230" width="60" height="230" rx="30" fill="#7ea3df"/>
+  <rect x="410" y="210" width="22" height="250" rx="10" fill="#9ab6ea" transform="rotate(18 421 335)"/>
+  <text x="400" y="525" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" fill="#4a6fb5">BEAUTY TOOLS</text>
+</svg>

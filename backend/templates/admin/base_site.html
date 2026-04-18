@@ -1,0 +1,127 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{{ title }} | {% trans 'Glow Beyond Beauty Admin' %}{% endblock %}
+
+{% block branding %}
+<a href="{% url 'admin:index' %}" class="django-admin-logo">
+    <div class="logo-container">
+        <span class="logo-icon">✨</span>
+        <span class="logo-text">Glow Beyond Beauty</span>
+    </div>
+</a>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Brand Colors */
+    :root {
+        --primary: #8B5CF6;
+        --secondary: #A78BFA;
+        --accent: #F472B6;
+        --dark: #1F2937;
+        --light: #F3F4F6;
+    }
+    
+    /* Header Styling */
+    #header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    #header a:link, #header a:visited {
+        color: white;
+    }
+    
+    /* Logo Styling */
+    .django-admin-logo {
+        text-decoration: none;
+    }
+    
+    .logo-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .logo-icon {
+        font-size: 24px;
+    }
+    
+    .logo-text {
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Breadcrumbs */
+    div.breadcrumbs {
+        background: #4B5563;
+        color: white;
+        padding: 10px 40px;
+    }
+    
+    /* Dashboard Cards */
+    .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border-left: 4px solid var(--primary);
+    }
+    
+    .stat-card h3 {
+        margin: 0 0 10px 0;
+        color: #6B7280;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .stat-card .value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--dark);
+    }
+    
+    /* Button Styling */
+    .button, input[type="submit"], input[type="button"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 6px;
+    }
+    
+    .button:hover, input[type="submit"]:hover {
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    }
+    
+    /* Table Styling */
+    #changelist table {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Module Headers */
+    .module h2, .module caption, .inline-group h2 {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block footer %}
+<div id="footer" style="text-align: center; padding: 20px; color: #6B7280; font-size: 12px;">
+    <p>Glow Beyond Beauty Admin Panel &copy; 2026. Built with Django.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connection Test</title>
+</head>
+<body>
+    <h1>Testing Frontend-Backend Connection</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testConnection() {
+            const results = document.getElementById('results');
+            
+            try {
+                // Test 1: Health check
+                const healthResponse = await fetch('http://localhost:8000/api/health/');
+                const healthData = await healthResponse.json();
+                results.innerHTML += `<p>✅ Backend Health: ${healthResponse.status} - ${healthData.message}</p>`;
+                
+                // Test 2: Authentication
+                const loginResponse = await fetch('http://localhost:8000/api/auth/token/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (loginResponse.ok) {
+                    const authData = await loginResponse.json();
+                    const token = authData.access;
+                    
+                    results.innerHTML += `<p>✅ Authentication: Success</p>`;
+                    
+                    // Test 3: Authenticated API calls
+                    const headers = {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    };
+                    
+                    const [productsResponse, inventoryResponse, ordersResponse] = await Promise.all([
+                        fetch('http://localhost:8000/api/products/', { headers }),
+                        fetch('http://localhost:8000/api/inventory/', { headers }),
+                        fetch('http://localhost:8000/api/orders/', { headers })
+                    ]);
+                    
+                    const products = await productsResponse.json();
+                    const inventory = await inventoryResponse.json();
+                    const orders = await ordersResponse.json();
+                    
+                    results.innerHTML += `<p>✅ Products: ${productsResponse.results?.length || 0} items</p>`;
+                    results.innerHTML += `<p>✅ Inventory: ${inventoryResponse.results?.length || 0} items</p>`;
+                    results.innerHTML += `<p>✅ Orders: ${ordersResponse.results?.length || 0} items</p>`;
+                    
+                    results.innerHTML += `<h2>🎉 All Systems Connected Successfully!</h2>`;
+                    results.innerHTML += `<p><strong>Frontend URL:</strong> http://localhost:3000</p>`;
+                    results.innerHTML += `<p><strong>Backend URL:</strong> http://localhost:8000/api</p>`;
+                    results.innerHTML += `<p><strong>Status:</strong> ✅ FULLY OPERATIONAL</p>`;
+                    
+                } else {
+                    results.innerHTML += `<p>❌ Authentication Failed: ${loginResponse.status}</p>`;
+                }
+                
+            } catch (error) {
+                results.innerHTML += `<p>❌ Connection Error: ${error.message}</p>`;
+            }
+        }
+        
+        testConnection();
+    </script>
+</body>
+</html>

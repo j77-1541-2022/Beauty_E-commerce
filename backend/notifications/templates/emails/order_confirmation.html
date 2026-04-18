@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - Glow Beyond Beauty</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+        .header { background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #3b82f6 100%); padding: 40px 30px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; }
+        .header p { color: rgba(255,255,255,0.9); margin: 10px 0 0; font-size: 16px; }
+        .content { padding: 40px 30px; }
+        .order-number { background: #f3f4f6; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 30px; }
+        .order-number h2 { color: #1f2937; margin: 0; font-size: 24px; }
+        .order-number p { color: #6b7280; margin: 5px 0 0; font-size: 14px; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .items-table th { background: #f9fafb; color: #374151; padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+        .items-table td { padding: 12px; border-bottom: 1px solid #e5e7eb; color: #4b5563; }
+        .items-table .price { text-align: right; font-weight: 500; }
+        .total-row { background: #f9fafb; font-weight: 600; }
+        .total-row .price { color: #ec4899; font-size: 18px; }
+        .delivery-info { background: #eff6ff; border-radius: 8px; padding: 20px; margin: 30px 0; }
+        .delivery-info h3 { color: #1e40af; margin: 0 0 15px; font-size: 18px; }
+        .delivery-info p { color: #1e3a8a; margin: 5px 0; line-height: 1.6; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: 600; margin: 20px 0; }
+        .footer { background: #f9fafb; padding: 30px; text-align: center; color: #6b7280; font-size: 14px; }
+        .footer a { color: #ec4899; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Glow Beyond Beauty ✨</h1>
+            <p>Thank you for your order!</p>
+        </div>
+        
+        <div class="content">
+            <div class="order-number">
+                <h2>Order #{{ order_number }}</h2>
+                <p>Placed on {{ order_date }}</p>
+            </div>
+            
+            <h3 style="color: #1f2937; margin-bottom: 20px;">Order Items</h3>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Qty</th>
+                        <th class="price">Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td class="price">KSh {{ item.price }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total-row">
+                        <td colspan="2">Total</td>
+                        <td class="price">KSh {{ total }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="delivery-info">
+                <h3>📍 Delivery Address</h3>
+                <p>{{ delivery_address }}</p>
+            </div>
+            
+            <center>
+                <a href="{{ frontend_url }}/orders/{{ order_id }}" class="btn">Track Order</a>
+            </center>
+        </div>
+        
+        <div class="footer">
+            <p>Need help? Contact us at <a href="mailto:support@glowbeyond.com">support@glowbeyond.com</a></p>
+            <p style="margin-top: 10px; font-size: 12px;">© 2024 Glow Beyond Beauty. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

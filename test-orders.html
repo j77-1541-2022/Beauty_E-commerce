@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Orders Test</title>
+</head>
+<body>
+    <h1>Testing Orders Display</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testOrdersAPI() {
+            try {
+                // Test authentication
+                const loginResponse = await fetch('http://localhost:8000/api/auth/token/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                if (loginResponse.ok) {
+                    const authData = await loginResponse.json();
+                    const token = authData.access;
+                    const headers = {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    };
+                    
+                    // Test orders API
+                    const ordersResponse = await fetch('http://localhost:8000/api/orders/', { headers });
+                    
+                    if (ordersResponse.ok) {
+                        const ordersData = await ordersResponse.json();
+                        const orders = ordersData.results || ordersData;
+                        
+                        document.getElementById('results').innerHTML = `
+                            <h2>✅ Orders API Working!</h2>
+                            <p>Orders Count: ${orders.length}</p>
+                            <h3>Sample Orders:</h3>
+                            <ul>
+                                ${orders.map(order => `
+                                    <li>
+                                        <strong>${order.order_number}</strong> - ${order.customer_name}
+                                        <br>Status: ${order.status}
+                                        <br>Total: $${order.total_amount}
+                                        <br>Items: ${order.items ? order.items.length : 0}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        `;
+                    } else {
+                        document.getElementById('results').innerHTML = '<p>❌ Orders API Failed</p>';
+                    }
+                } else {
+                    document.getElementById('results').innerHTML = '<p>❌ Authentication Failed</p>';
+                }
+            } catch (error) {
+                document.getElementById('results').innerHTML = `<p>❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        testOrdersAPI();
+    </script>
+</body>
+</html>

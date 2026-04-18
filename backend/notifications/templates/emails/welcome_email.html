@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Glow Beyond Beauty</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+        .header { background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #3b82f6 100%); padding: 60px 30px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 32px; }
+        .header p { color: rgba(255,255,255,0.9); margin: 15px 0 0; font-size: 18px; }
+        .content { padding: 50px 30px; text-align: center; }
+        .welcome-text { color: #4b5563; font-size: 18px; line-height: 1.8; margin-bottom: 30px; }
+        .features { display: flex; justify-content: center; gap: 30px; margin: 40px 0; flex-wrap: wrap; }
+        .feature { text-align: center; }
+        .feature-icon { font-size: 36px; margin-bottom: 10px; }
+        .feature p { color: #6b7280; font-size: 14px; margin: 0; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%); color: #ffffff; text-decoration: none; padding: 18px 50px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 20px 0; }
+        .social { margin: 30px 0; }
+        .social a { display: inline-block; margin: 0 10px; color: #ec4899; text-decoration: none; }
+        .footer { background: #f9fafb; padding: 40px 30px; text-align: center; color: #6b7280; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Welcome to Glow Beyond Beauty! ✨</h1>
+            <p>Your journey to radiant beauty starts here</p>
+        </div>
+        
+        <div class="content">
+            <p class="welcome-text">
+                Hi {{ first_name }},<br><br>
+                We're thrilled to have you join our beauty community! Get ready to discover premium skincare, makeup, and wellness products curated just for you.
+            </p>
+            
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">🛍️</div>
+                    <p>Shop Premium<br>Products</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🚚</div>
+                    <p>Fast Delivery<br>Across Kenya</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">💝</div>
+                    <p>Exclusive<br>Member Deals</p>
+                </div>
+            </div>
+            
+            <a href="{{ frontend_url }}/shop" class="btn">Start Shopping</a>
+            
+            <p style="color: #9ca3af; margin-top: 30px; font-size: 14px;">
+                Follow us for beauty tips and exclusive offers:
+            </p>
+            
+            <div class="social">
+                <a href="#">Instagram</a> • 
+                <a href="#">Facebook</a> • 
+                <a href="#">Twitter</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Need help? We're here for you!<br>
+            <a href="mailto:support@glowbeyond.com" style="color: #ec4899;">support@glowbeyond.com</a></p>
+            <p style="margin-top: 20px; font-size: 12px;">
+                © 2024 Glow Beyond Beauty. All rights reserved.<br>
+                You're receiving this because you created an account on glowbeyond.com
+            </p>
+        </div>
+    </div>
+</body>
+</html>

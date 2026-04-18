@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Makeup brush placeholder">
+  <rect width="800" height="600" fill="#fff4f8"/>
+  <ellipse cx="400" cy="190" rx="95" ry="65" fill="#ffd3e0"/>
+  <rect x="370" y="230" width="60" height="210" rx="30" fill="#ff8fb2"/>
+  <rect x="360" y="430" width="80" height="70" rx="20" fill="#d85a87"/>
+  <text x="400" y="530" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" fill="#c63f70">MAKEUP BRUSH</text>
+</svg>
