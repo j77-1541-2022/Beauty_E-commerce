@@ -14,7 +14,7 @@ const sections = [
     id: 'contact',
     title: 'Contact',
     icon: Mail,
-    content: 'Reach us via email at info@glowbeyond.co.ke or by phone at +254 712 345 678. Our support team responds during business hours, Monday to Saturday.',
+    content: 'Reach us via WhatsApp at +254 111 551 064 or email us through Gmail at simonekinyua8@gmail.com. Our support team responds during business hours, Monday to Saturday.',
   },
   {
     id: 'faq',

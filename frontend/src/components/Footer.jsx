@@ -5,9 +5,8 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  Facebook, 
-  Instagram, 
-  Twitter, 
+  MessageCircle,
+  Globe,
   Heart,
   Sparkles,
   ShoppingBag,
@@ -20,6 +19,11 @@ const Footer = () => {
   const currentYear = new Date().getFullYear()
   const isDark = theme === 'dark'
   const [newsletterEmail, setNewsletterEmail] = useState('')
+  const contactPhone = '+254111551064'
+  const contactEmail = 'simonekinyua8@gmail.com'
+  const websiteUrl = 'https://glowbeyond.co.ke'
+  const whatsappUrl = `https://wa.me/254111551064?text=${encodeURIComponent('Hi Glow Beyond Beauty, I need help with an order or product inquiry.')}`
+  const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contactEmail)}&su=${encodeURIComponent('Glow Beyond Inquiry')}`
 
   const handleNewsletterSubscribe = () => {
     const email = newsletterEmail.trim()
@@ -27,7 +31,7 @@ const Footer = () => {
 
     const subject = encodeURIComponent('Newsletter Subscription Request')
     const body = encodeURIComponent(`Please add this email to the Glow Beyond newsletter list: ${email}`)
-    window.location.href = `mailto:simonekinyua8@gmail.com?subject=${subject}&body=${body}`
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contactEmail)}&su=${subject}&body=${body}`, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -54,25 +58,34 @@ const Footer = () => {
             </p>
             <div className="flex space-x-4">
               <motion.a
-                href="#"
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 whileHover={{ scale: 1.1 }}
+                aria-label="Chat on WhatsApp"
                 className={`p-2 ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} rounded-lg transition-colors`}
               >
-                <Facebook className="w-5 h-5" />
+                <MessageCircle className="w-5 h-5" />
               </motion.a>
               <motion.a
-                href="#"
+                href={gmailComposeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 whileHover={{ scale: 1.1 }}
+                aria-label="Email via Gmail"
                 className={`p-2 ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} rounded-lg transition-colors`}
               >
-                <Instagram className="w-5 h-5" />
+                <Mail className="w-5 h-5" />
               </motion.a>
               <motion.a
-                href="#"
+                href={websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 whileHover={{ scale: 1.1 }}
+                aria-label="Visit website"
                 className={`p-2 ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300'} rounded-lg transition-colors`}
               >
-                <Twitter className="w-5 h-5" />
+                <Globe className="w-5 h-5" />
               </motion.a>
             </div>
           </motion.div>
@@ -174,14 +187,14 @@ const Footer = () => {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Mail className={`w-5 h-5 ${colors.accent}`} />
-                <a href="mailto:simonekinyua8@gmail.com?subject=Glow%20Beyond%20Inquiry" className={`${isDark ? 'text-gray-300 hover:text-pink-400' : 'text-gray-600 hover:text-pink-600'} transition-colors`}>
-                  info@glowbeyond.co.ke
+                <a href={gmailComposeUrl} target="_blank" rel="noopener noreferrer" className={`${isDark ? 'text-gray-300 hover:text-pink-400' : 'text-gray-600 hover:text-pink-600'} transition-colors`}>
+                  {contactEmail}
                 </a>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className={`w-5 h-5 ${colors.accent}`} />
-                <a href="tel:+254712345678" className={`${isDark ? 'text-gray-300 hover:text-pink-400' : 'text-gray-600 hover:text-pink-600'} transition-colors`}>
-                  +254 712 345 678
+                <a href={`tel:${contactPhone}`} className={`${isDark ? 'text-gray-300 hover:text-pink-400' : 'text-gray-600 hover:text-pink-600'} transition-colors`}>
+                  +254 111 551 064
                 </a>
               </div>
               <div className="flex items-center space-x-3">
