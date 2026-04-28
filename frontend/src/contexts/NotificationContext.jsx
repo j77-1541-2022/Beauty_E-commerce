@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 
 const NotificationContext = createContext()
 
@@ -12,9 +12,11 @@ export const useNotification = () => {
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([])
+  const notificationCounterRef = useRef(0)
 
   const showNotification = useCallback((message, type = 'info') => {
-    const id = Date.now()
+    notificationCounterRef.current += 1
+    const id = `${Date.now()}-${notificationCounterRef.current}`
     setNotifications(prev => [...prev, { id, message, type }])
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))

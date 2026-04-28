@@ -39,7 +39,8 @@ class CartItem(models.Model):
     
     @property
     def total_price(self):
-        return self.quantity * self.product.selling_price
+        """Calculate total price using product price (with discount applied)"""
+        return self.quantity * self.product.price
     
     def get_total_price(self):
         return self.total_price

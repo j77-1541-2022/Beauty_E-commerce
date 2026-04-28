@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Legend, Area, AreaChart
 } from 'recharts'
-import { Wallet, TrendingUp, TrendingDown, Clock, AlertCircle, PieChart as PieIcon } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, Clock, AlertCircle, PieChart as PieIcon, Send } from 'lucide-react'
 import { GlassCard } from '../../components/ui/GlassCard'
 import SkeletonLoader from '../../components/ui/SkeletonLoader'
 import { dealerAPI } from '../../services/apiClient'
@@ -16,9 +16,14 @@ const DealerEarnings = () => {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [chartType, setChartType] = useState('bar') // 'bar' or 'line'
+  const [payouts, setPayouts] = useState([])
+  const [payoutsLoading, setPayoutsLoading] = useState(false)
+  const [requestingPayout, setRequestingPayout] = useState(false)
+  const [payoutMessage, setPayoutMessage] = useState(null)
 
   useEffect(() => {
     fetchEarnings()
+    fetchPayouts()
   }, [])
 
   const fetchEarnings = async () => {
@@ -29,6 +34,58 @@ const DealerEarnings = () => {
       console.error('Failed to load dealer earnings:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPayouts = async () => {
+    try {
+      setPayoutsLoading(true)
+      const res = await dealerAPI.getPayouts()
+      setPayouts(res.data.payouts || [])
+    } catch (err) {
+      console.error('Failed to load payouts:', err)
+    } finally {
+      setPayoutsLoading(false)
+    }
+  }
+
+  const handleRequestPayout = async () => {
+    try {
+      setRequestingPayout(true)
+      setPayoutMessage(null)
+
+      const defaultAmount = Number(data?.pending_payout_ksh || 0).toFixed(2)
+      const entered = window.prompt(
+        `Enter payout amount in KSh (available: ${formatKSH(data?.pending_payout_ksh || 0)}):`,
+        defaultAmount
+      )
+
+      if (entered === null) {
+        setRequestingPayout(false)
+        return
+      }
+
+      const amount = Number(String(entered).replace(/,/g, '').trim())
+      if (Number.isNaN(amount) || amount <= 0) {
+        setPayoutMessage({ type: 'error', text: 'Please enter a valid payout amount greater than zero.' })
+        setRequestingPayout(false)
+        return
+      }
+
+      const res = await dealerAPI.requestPayout({ amount })
+      if (res.data.success) {
+        const remaining = res.data.remaining_pending_ksh
+        const suffix = remaining !== undefined ? ` Remaining pending: ${formatKSH(remaining)}.` : ''
+        setPayoutMessage({ type: 'success', text: `${res.data.message}.${suffix}` })
+        fetchPayouts()
+        fetchEarnings()
+      } else {
+        setPayoutMessage({ type: 'error', text: res.data.error || 'Failed to request payout' })
+      }
+    } catch (err) {
+      setPayoutMessage({ type: 'error', text: err.response?.data?.error || 'Failed to request payout' })
+    } finally {
+      setRequestingPayout(false)
     }
   }
 
@@ -43,12 +100,13 @@ const DealerEarnings = () => {
   ] : []
 
   // Prepare commission breakdown data for pie chart
-  const commissionData = data?.monthly_breakdown?.slice(-6).map((month, index) => ({
+  const lastSixMonths = data?.monthly_breakdown?.slice(-6) || []
+  const commissionData = lastSixMonths.map((month) => ({
     name: month.month,
     earnings: month.earnings_ksh,
     commission: month.commission_ksh,
     revenue: month.revenue_ksh
-  })) || []
+  }))
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
@@ -153,7 +211,7 @@ const DealerEarnings = () => {
         </div>
         <ResponsiveContainer width="100%" height={300}>
           {chartType === 'bar' ? (
-            <BarChart data={data?.monthly_breakdown || []}>
+            <BarChart data={lastSixMonths}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="month" />
               <YAxis tickFormatter={(val) => `KSh ${(val / 1000).toFixed(0)}k`} />
@@ -163,7 +221,7 @@ const DealerEarnings = () => {
               <Bar dataKey="commission_ksh" name="Commission" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
           ) : (
-            <AreaChart data={data?.monthly_breakdown || []}>
+            <AreaChart data={lastSixMonths}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="month" />
               <YAxis tickFormatter={(val) => `KSh ${(val / 1000).toFixed(0)}k`} />
@@ -208,15 +266,86 @@ const DealerEarnings = () => {
 
       <GlassCard className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Payout History</h2>
-          <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-            Coming Soon
-          </span>
+          <h2 className="text-lg font-bold text-slate-900">Payout History</h2>
+          <div className="flex items-center gap-2">
+            {data?.pending_payout_ksh > 0 && (
+              <button
+                onClick={handleRequestPayout}
+                disabled={requestingPayout}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors disabled:opacity-50 text-sm font-semibold"
+              >
+                <Send className="w-4 h-4" />
+                {requestingPayout ? 'Processing...' : `Request Payout (${formatKSH(data.pending_payout_ksh)})`}
+              </button>
+            )}
+            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+              {payouts.length > 0 ? 'Active' : 'No History'}
+            </span>
+          </div>
         </div>
-        <div className="text-center py-8 text-gray-500">
-          <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-          <p>Payout history will be available once payouts begin</p>
+
+        {payoutMessage && (
+          <div className={`mb-4 p-3 rounded-lg ${payoutMessage.type === 'success' ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+            {payoutMessage.text}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          {payoutsLoading ? (
+            <div className="py-8 text-center text-slate-500">Loading payouts...</div>
+          ) : payouts.length === 0 ? (
+            <div className="py-8 text-center text-slate-500">
+              <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+              <p>No payouts yet. Your earnings will appear here once processed.</p>
+              {data?.pending_payout_ksh > 0 && (
+                <p className="text-sm mt-2 text-emerald-600 font-medium">
+                  You have {formatKSH(data.pending_payout_ksh)} available to withdraw!
+                </p>
+              )}
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-emerald-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-emerald-900 font-bold">Date</th>
+                  <th className="px-4 py-3 text-left text-emerald-900 font-bold">Period</th>
+                  <th className="px-4 py-3 text-right text-emerald-900 font-bold">Amount</th>
+                  <th className="px-4 py-3 text-center text-emerald-900 font-bold">Status</th>
+                  <th className="px-4 py-3 text-left text-emerald-900 font-bold">Reference</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-emerald-100">
+                {payouts.map((payout) => (
+                  <tr key={payout.id} className="hover:bg-emerald-50">
+                    <td className="px-4 py-3 text-slate-900 font-medium">{payout.created_at}</td>
+                    <td className="px-4 py-3 text-slate-700">{payout.period_start} - {payout.period_end}</td>
+                    <td className="px-4 py-3 text-right text-slate-900 font-bold">
+                      KSh {payout.amount.toLocaleString('en-KE', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                        payout.status === 'completed' ? 'bg-emerald-100 text-emerald-700 border-emerald-300' :
+                        payout.status === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                        payout.status === 'processing' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                        'bg-red-100 text-red-700 border-red-300'
+                      }`}>
+                        {payout.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 font-mono text-sm">
+                      {payout.mpesa_receipt_number || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
+        {payouts.length > 0 && (
+          <p className="text-xs text-slate-500 mt-4 text-center">
+            Payouts are processed automatically via M-Pesa. Funds typically arrive within 24 hours.
+          </p>
+        )}
       </GlassCard>
     </div>
   )

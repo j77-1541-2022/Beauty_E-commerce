@@ -24,6 +24,8 @@ from .serializers import (
 
 User = get_user_model()
 
+from cart.services import merge_guest_cart_to_user
+
 
 class AuthViewSet(viewsets.GenericViewSet):
     """
@@ -202,13 +204,16 @@ class AuthViewSet(viewsets.GenericViewSet):
         
         # Generate tokens
         refresh = RefreshToken.for_user(user)
+
+        merge_result = merge_guest_cart_to_user(request, user)
         
         return Response({
             'success': True,
             'data': {
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
-                'user': UserSerializer(user).data
+                'user': UserSerializer(user).data,
+                'guest_cart_merge': merge_result,
             },
             'message': f'Welcome back, {user.first_name}!'
         }, status=status.HTTP_200_OK)

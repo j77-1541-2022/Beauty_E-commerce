@@ -1,4 +1,4 @@
-import api from './api'
+import apiClient from './apiClient'
 
 // Order API Service
 // Handles customer orders and admin order management
@@ -7,7 +7,7 @@ const orderAPI = {
   // Create a new customer order
   createOrder: async (orderData) => {
     try {
-      const response = await api.post('/orders/', orderData)
+      const response = await apiClient.post('/orders/', orderData)
       return response.data
     } catch (error) {
       console.error('Failed to create order:', error)
@@ -18,7 +18,7 @@ const orderAPI = {
   // Get customer orders
   getCustomerOrders: async (customerId, params = {}) => {
     try {
-      const response = await api.get(`/orders/customer/${customerId}`, { params })
+      const response = await apiClient.get(`/orders/customer/${customerId}`, { params })
       return response.data
     } catch (error) {
       console.error('Failed to fetch customer orders:', error)
@@ -29,7 +29,7 @@ const orderAPI = {
   // Get all orders (admin)
   getAllOrders: async (params = {}) => {
     try {
-      const response = await api.get('/admin/orders', { params })
+      const response = await apiClient.get('/admin/orders', { params })
       return response.data
     } catch (error) {
       console.error('Failed to fetch all orders:', error)
@@ -40,7 +40,7 @@ const orderAPI = {
   // Get order details
   getOrderDetails: async (orderId) => {
     try {
-      const response = await api.get(`/orders/${orderId}`)
+      const response = await apiClient.get(`/orders/${orderId}`)
       return response.data
     } catch (error) {
       console.error('Failed to fetch order details:', error)
@@ -51,7 +51,7 @@ const orderAPI = {
   // Update order status (admin)
   updateOrderStatus: async (orderId, status) => {
     try {
-      const response = await api.patch(`/admin/orders/${orderId}/status`, { status })
+      const response = await apiClient.patch(`/admin/orders/${orderId}/status`, { status })
       return response.data
     } catch (error) {
       console.error('Failed to update order status:', error)
@@ -62,7 +62,7 @@ const orderAPI = {
   // Cancel customer order
   cancelOrder: async (orderId) => {
     try {
-      const response = await api.patch(`/orders/${orderId}/cancel`)
+      const response = await apiClient.patch(`/orders/${orderId}/cancel`)
       return response.data
     } catch (error) {
       console.error('Failed to cancel order:', error)
@@ -73,7 +73,7 @@ const orderAPI = {
   // Get order statistics (admin)
   getOrderStats: async () => {
     try {
-      const response = await api.get('/admin/orders/stats')
+      const response = await apiClient.get('/admin/orders/stats')
       return response.data
     } catch (error) {
       console.error('Failed to fetch order statistics:', error)
@@ -84,7 +84,7 @@ const orderAPI = {
   // Process payment for order
   processPayment: async (orderId, paymentData) => {
     try {
-      const response = await api.post(`/orders/${orderId}/payment`, paymentData)
+      const response = await apiClient.post(`/orders/${orderId}/payment`, paymentData)
       return response.data
     } catch (error) {
       console.error('Failed to process payment:', error)
@@ -95,7 +95,7 @@ const orderAPI = {
   // Get order tracking information
   getOrderTracking: async (orderId) => {
     try {
-      const response = await api.get(`/orders/${orderId}/tracking`)
+      const response = await apiClient.get(`/orders/${orderId}/timeline/`)
       return response.data
     } catch (error) {
       console.error('Failed to fetch order tracking:', error)
@@ -103,13 +103,13 @@ const orderAPI = {
     }
   },
 
-  // Update order tracking (admin)
-  updateOrderTracking: async (orderId, trackingData) => {
+  // Reorder - add items from delivered order to cart
+  reorder: async (orderId) => {
     try {
-      const response = await api.post(`/admin/orders/${orderId}/tracking`, trackingData)
+      const response = await apiClient.post(`/orders/${orderId}/reorder/`)
       return response.data
     } catch (error) {
-      console.error('Failed to update order tracking:', error)
+      console.error('Failed to reorder:', error)
       throw error
     }
   }

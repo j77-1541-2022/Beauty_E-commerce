@@ -78,97 +78,6 @@ class ExportInventoryCSVView(APIView):
         return response
 # ================= SECTION B: DSS DECISION SUPPORT SYSTEM ENDPOINTS =================
 
-class DemandForecastView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        """
-        FR6 — DSS: Demand Forecasting
-        Uses exponential smoothing on historical sales data.
-        Returns actual sales history + 4-week forecast.
-        """
-        from products.models import Product
-        from orders.models import OrderItem
-        from django.utils import timezone
-        from datetime import timedelta
-        from collections import defaultdict
-
-        product_id = request.query_params.get('product_id', None)
-
-        user = request.user
-        if hasattr(user, 'role') and user.role == 'dealer':
-            try:
-                dealer_profile = user.dealerprofile
-                products = Product.objects.filter(dealer=dealer_profile)
-            except:
-                products = Product.objects.filter(added_by=user)
-        else:
-            products = Product.objects.all()
-
-        if product_id:
-            products = products.filter(id=product_id)
-
-        twelve_weeks_ago = timezone.now() - timedelta(weeks=12)
-        forecasts = []
-        for product in products[:20]:
-            weekly_sales = defaultdict(int)
-            order_items = OrderItem.objects.filter(
-                product=product,
-                order__created_at__gte=twelve_weeks_ago,
-                order__status__in=['confirmed', 'processing', 'shipped', 'delivered']
-            ).select_related('order')
-            for item in order_items:
-                weeks_ago = (timezone.now() - item.order.created_at).days // 7
-                week_key = 12 - weeks_ago
-                if 0 <= week_key <= 11:
-                    weekly_sales[week_key] += item.quantity
-            actuals = [weekly_sales.get(i, 0) for i in range(12)]
-            alpha = 0.3
-            smoothed = [actuals[0]]
-            for i in range(1, len(actuals)):
-                smoothed.append(alpha * actuals[i] + (1 - alpha) * smoothed[i-1])
-            last_smoothed = smoothed[-1] if smoothed else 0
-            trend = 0
-            if len(smoothed) >= 4:
-                recent_avg = sum(smoothed[-4:]) / 4
-                older_avg = sum(smoothed[-8:-4]) / 4 if len(smoothed) >= 8 else recent_avg
-                trend = (recent_avg - older_avg) / 4
-            forecast_weeks = []
-            current_forecast = last_smoothed
-            for i in range(4):
-                current_forecast = max(0, current_forecast + trend)
-                forecast_weeks.append(round(current_forecast, 1))
-            week_labels = [f'W{i+1}' for i in range(12)] + [f'F{i+1}' for i in range(4)]
-            actual_series = actuals + [None] * 4
-            forecast_series = [None] * 11 + [actuals[-1]] + forecast_weeks
-            total_actual = sum(actuals)
-            avg_weekly = total_actual / 12 if total_actual > 0 else 0
-            predicted_next_month = sum(forecast_weeks)
-            try:
-                current_stock = product.inventoryitem.quantity
-            except:
-                current_stock = getattr(product, 'stock_quantity', getattr(product, 'current_stock', 0))
-            stock_coverage_weeks = (
-                current_stock / avg_weekly if avg_weekly > 0 else 99
-            )
-            forecasts.append({
-                'product_id': product.id,
-                'product_name': product.name,
-                'sku': getattr(product, 'sku', f'SKU-{product.id}'),
-                'current_stock': current_stock,
-                'avg_weekly_demand': round(avg_weekly, 1),
-                'predicted_next_4_weeks': round(predicted_next_month, 0),
-                'stock_coverage_weeks': round(min(stock_coverage_weeks, 99), 1),
-                'trend_direction': 'up' if trend > 0.5 else 'down' if trend < -0.5 else 'stable',
-                'chart': {
-                    'labels': week_labels,
-                    'actual': actual_series,
-                    'forecast': forecast_series,
-                },
-            })
-        forecasts.sort(key=lambda x: x['predicted_next_4_weeks'], reverse=True)
-        return Response({'success': True, 'data': forecasts})
-
 class ABCAnalysisView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -302,7 +211,9 @@ class EOQCalculatorView(APIView):
         from datetime import timedelta
         import math
         ordering_cost = float(request.query_params.get('ordering_cost', 500))
-        holding_cost_rate = float(request.query_params.get('holding_rate', 0.25))
+        holding_cost_rate = float(request.query_params.get('holding_cost_percent', 20)) / 100
+        lead_time_days = int(request.query_params.get('lead_time', 7))
+        safety_days = int(request.query_params.get('safety_days', 3))
         user = request.user
         if hasattr(user, 'role') and user.role == 'dealer':
             try:
@@ -338,9 +249,8 @@ class EOQCalculatorView(APIView):
             total_ordering_cost = orders_per_year * ordering_cost
             total_holding_cost = (eoq / 2) * holding_cost_per_unit
             total_annual_cost = total_ordering_cost + total_holding_cost
-            lead_time_days = 7
             daily_demand = annual_demand / 365
-            safety_stock = round(daily_demand * 3)
+            safety_stock = round(daily_demand * safety_days)
             reorder_point = round(daily_demand * lead_time_days) + safety_stock
             try:
                 current_stock = product.inventoryitem.quantity

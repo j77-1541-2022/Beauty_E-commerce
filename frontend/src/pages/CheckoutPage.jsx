@@ -65,6 +65,7 @@ const CheckoutPage = () => {
   })
   
   const [shippingMethod, setShippingMethod] = useState('standard')
+  const [shippingZone, setShippingZone] = useState('nairobi_cbd') // New: zone-based shipping
   const [paymentMethod, setPaymentMethod] = useState('mpesa') // 'card', 'mpesa', or 'cash'
   const [mpesaPhone, setMpesaPhone] = useState('')
   const [paymentStatus, setPaymentStatus] = useState('idle') // 'idle', 'processing', 'awaiting_confirmation', 'completed', 'failed', 'timeout'
@@ -78,6 +79,15 @@ const CheckoutPage = () => {
     total: 0
   })
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!user) {
+      showNotification('Please log in to proceed with checkout', 'info')
+      localStorage.setItem('redirectAfterLogin', '/checkout')
+      navigate('/login')
+    }
+  }, [user, navigate, showNotification])
+
   const extractPaymentStatus = (statusResponse) => {
     return (
       statusResponse?.data?.data?.payment?.status ||
@@ -87,9 +97,26 @@ const CheckoutPage = () => {
     )
   }
 
-  const resolvePaymentState = (status) => {
+  const resolvePaymentState = async (status) => {
     if (status === 'completed' || status === 'paid') {
       setPaymentStatus('completed')
+      
+      // Refresh order data to get receipt URL and updated status
+      if (orderData?.id) {
+        try {
+          const orderResponse = await orderAPI.getById(orderData.id)
+          const refreshedOrder = orderResponse?.data?.data || orderResponse?.data || orderResponse
+          if (refreshedOrder?.id) {
+            setOrderData(refreshedOrder)
+            if (refreshedOrder.receipt_url) {
+              setReceiptUrl(refreshedOrder.receipt_url)
+            }
+          }
+        } catch (err) {
+          console.error('[resolvePaymentState] Failed to refresh order:', err)
+        }
+      }
+      
       setOrderPlaced(true)
       showNotification('Payment confirmed. Order placed successfully.', 'success')
       setLoading(false)
@@ -111,11 +138,14 @@ const CheckoutPage = () => {
   const { run: runMpesaRetry, loading: retryingMpesa } = useApiAction(
     'checkout.mpesa.retry',
     async ({ orderId, phoneNumber }) => {
-      return paymentAPI.initiate({
+      console.log('[M-Pesa Retry] Initiating payment:', { orderId, phoneNumber: normalizeKenyanPhone(phoneNumber) })
+      const result = await paymentAPI.initiate({
         order_id: orderId,
         phone_number: normalizeKenyanPhone(phoneNumber),
         payment_method: 'mpesa'
       })
+      console.log('[M-Pesa Retry] Response received:', result)
+      return result
     },
     {
       startMessage: 'Retrying M-Pesa request...',
@@ -143,10 +173,19 @@ const CheckoutPage = () => {
 
   const activeStage = currentStep === 1 ? 2 : currentStep === 2 ? 3 : 4
 
+  // Shipping zones with costs
+  const shippingZones = [
+    { id: 'nairobi_cbd', name: 'Nairobi (CBD)', cost: 2.00 },
+    { id: 'nairobi_other', name: 'Nairobi (Other)', cost: 3.00 },
+    { id: 'machakos', name: 'Machakos Town', cost: 5.00 },
+    { id: 'athi_river', name: 'Athi River', cost: 4.00 },
+    { id: 'other', name: 'Other Locations', cost: 15.00 }
+  ]
+
   const shippingOptions = [
-    { id: 'standard', name: 'Standard Shipping', price: 100, days: '5-7 business days' },
-    { id: 'express', name: 'Express Shipping', price: 600, days: '2-3 business days' },
-    { id: 'overnight', name: 'Overnight Shipping', price: 1000, days: '1 business day' }
+    { id: 'standard', name: 'Standard Shipping', price: 2, days: '5-7 business days' },
+    { id: 'express', name: 'Express Shipping', price: 2, days: '2-3 business days' },
+    { id: 'overnight', name: 'Overnight Shipping', price: 2, days: '1 business day' }
   ]
 
   // Format price in KSH
@@ -184,6 +223,8 @@ const CheckoutPage = () => {
       // Transform backend cart items to frontend format with price
       const transformedItems = (cartData.items || []).map(item => ({
         id: item.product?.id,
+        product_id: item.product?.id,  // Keep product_id for order creation
+        product: item.product,  // Keep full product object for reference
         name: item.product?.name,
         price: item.product?.selling_price || item.product?.price || 0,
         image: item.product?.primary_image,
@@ -198,11 +239,11 @@ const CheckoutPage = () => {
 
   const calculateOrderSummary = (items) => {
     const subtotalBeforeTax = items.reduce((total, item) => total + (item.price * item.quantity), 0)
-    const tax = subtotalBeforeTax * 0.08 // 8% tax
+    const tax = 0
     const subtotal = subtotalBeforeTax + tax
     const shipping = paymentMethod === 'cash'
       ? 0
-      : (shippingOptions.find(option => option.id === shippingMethod)?.price || 0)
+      : (shippingZones.find(zone => zone.id === shippingZone)?.cost || 0)
     const total = subtotal + shipping
 
     setOrderSummary({ subtotal, subtotalBeforeTax, shipping, tax, total })
@@ -210,7 +251,7 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     calculateOrderSummary(cartItems)
-  }, [cartItems, shippingMethod, paymentMethod])
+  }, [cartItems, shippingZone, paymentMethod])
 
   const handleShippingSubmit = (e) => {
     e.preventDefault()
@@ -223,6 +264,17 @@ const CheckoutPage = () => {
   }
 
   const handlePlaceOrder = async () => {
+    if (!cartItems.length) {
+      showNotification('Your cart is empty. Add products before placing an order.', 'warning')
+      return
+    }
+
+    const invalidCartItem = cartItems.find(item => !item.id || !item.quantity || item.quantity < 1)
+    if (invalidCartItem) {
+      showNotification('Your cart has invalid items. Please refresh cart and try again.', 'error')
+      return
+    }
+
     setLoading(true)
     setGlobalLoading('checkout.placeOrder', true)
     showNotification('Processing your order...', 'info')
@@ -233,23 +285,55 @@ const CheckoutPage = () => {
         customer_email: shippingInfo.email,
         customer_phone: normalizeKenyanPhone(shippingInfo.phone),
         shipping_address: `${shippingInfo.address}, ${shippingInfo.city}, ${shippingInfo.state} ${shippingInfo.zipCode}`,
+        shipping_zone: shippingZone, // Include zone for tracking
         subtotal: orderSummary.subtotal,
         tax_amount: 0,
         shipping_cost: paymentMethod === 'cash' ? 0 : orderSummary.shipping,
         items: cartItems.map(item => ({
-          product_id: item.id,
+          product_id: item.product_id || item.product?.id || item.id,
           quantity: item.quantity,
           unit_price: item.price,
           total_price: item.price * item.quantity
         }))
       }
       
+      console.log('[Order Creation] Sending payload:', orderPayload)
       const orderResult = await orderAPI.create(orderPayload)
-      const createdOrder = orderResult?.data?.data?.order || orderResult?.data?.order || orderResult?.data || orderResult
+      console.log('[Order Creation] API Response:', orderResult)
+      
+      // Extract order from response (new APIResponseMixin wrapper structure)
+      let createdOrder = null
+      if (orderResult?.data?.data?.id) {
+        // New structure: { status: 'success', data: { ...order... }, message: '...' }
+        createdOrder = orderResult.data.data
+        console.log('[Order Creation] Extracted from data.data')
+      } else if (orderResult?.data?.id) {
+        // Old structure: direct order in data
+        createdOrder = orderResult.data
+        console.log('[Order Creation] Extracted from data')
+      } else if (orderResult?.id) {
+        // Fallback: order at root
+        createdOrder = orderResult
+        console.log('[Order Creation] Extracted from root')
+      }
+      
+      if (!createdOrder?.id && !createdOrder?.order_number) {
+        console.error('Order creation failed: Invalid response structure', orderResult)
+        throw new Error('Order creation failed: Invalid response from server')
+      }
+      
       setOrderData(createdOrder)
       
       // If M-Pesa payment, initiate STK push
       if (paymentMethod === 'mpesa') {
+        if (!mpesaPhone) {
+          showNotification('Please enter M-Pesa phone number before proceeding.', 'warning')
+          setCurrentStep(2)
+          setLoading(false)
+          setGlobalLoading('checkout.placeOrder', false)
+          return
+        }
+        
         setPaymentStatus('processing')
         const paymentResponseResult = await runMpesaRetry({ orderId: createdOrder.id, phoneNumber: mpesaPhone })
 
@@ -265,7 +349,8 @@ const CheckoutPage = () => {
         const checkoutRequestId =
           paymentResponse?.data?.data?.payment?.checkout_request_id ||
           paymentResponse?.data?.payment?.checkout_request_id ||
-          paymentResponse?.data?.checkout_request_id
+          paymentResponse?.data?.checkout_request_id ||
+          paymentResponse?.checkout_request_id
 
         if (checkoutRequestId) {
           setPaymentStatus('awaiting_confirmation')
@@ -285,6 +370,7 @@ const CheckoutPage = () => {
           phone_number: normalizeKenyanPhone(shippingInfo.phone),
           payment_method: 'cash',
         })
+        console.log('Cash payment response:', cashResponse)
         setReceiptUrl(cashResponse?.data?.data?.receipt_url || cashResponse?.data?.receipt_url || '')
         setOrderPlaced(true)
         showNotification('Order placed and cash receipt generated.', 'success')
@@ -299,41 +385,72 @@ const CheckoutPage = () => {
       }
     } catch (error) {
       console.error('Failed to place order:', error)
+      const responseData = error?.response?.data || {}
+      const backendFields = responseData?.error?.fields || responseData?.errors || responseData?.data || responseData
+
+      let message = 'Failed to place order. Please review your details and try again.'
+
+      // Log full order payload for debugging
+      console.error('[Checkout] Order payload that failed:', orderPayload)
+      console.error('[Checkout] Cart items at time of error:', cartItems)
+      console.error('[Checkout] Backend error response:', responseData)
+
+      // Extract specific validation errors
+      if (backendFields?.items) {
+        const itemErrors = Array.isArray(backendFields.items) ? backendFields.items.join(', ') : backendFields.items
+        message = `Item validation error: ${itemErrors}`
+      } else if (Array.isArray(backendFields?.detail) && backendFields.detail.length) {
+        message = backendFields.detail[0]
+      } else if (typeof backendFields?.detail === 'string') {
+        message = backendFields.detail
+      } else if (Array.isArray(responseData?.non_field_errors) && responseData.non_field_errors.length) {
+        message = responseData.non_field_errors[0]
+      } else if (typeof responseData?.message === 'string' && responseData.message) {
+        message = responseData.message
+      }
+
       setPaymentStatus('failed')
       handleError(error, 'Checkout')
-      showNotification('Failed to place order. Please review your details and try again.', 'error')
+      showNotification(message, 'error')
       setLoading(false)
       setGlobalLoading('checkout.placeOrder', false)
     }
   }
 
   const pollPaymentStatus = async (orderId) => {
-    const maxAttempts = 40
-    let attempts = 0
+    const maxAttempts = 60 // 1 minute of fast polling (60 * 1 second)
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-    const interval = setInterval(async () => {
-      attempts++
-      
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const statusResponse = await paymentAPI.getStatus(orderId)
+        console.log(`Payment status check (attempt ${attempt}):`, statusResponse)
         const status = extractPaymentStatus(statusResponse)
+        console.log('Extracted payment status:', status)
 
-        if (resolvePaymentState(status)) {
-          clearInterval(interval)
+        const isTerminal = await resolvePaymentState(status)
+        if (isTerminal) {
+          return
         }
 
-        if (attempts >= maxAttempts) {
-          clearInterval(interval)
-          setPaymentStatus('timeout')
-          showNotification('Payment confirmation timed out. Please retry.', 'warning')
-          setLoading(false)
-          setGlobalLoading('checkout.placeOrder', false)
+        if (attempt < maxAttempts) {
+          await delay(1000) // Check every 1 second for faster response
         }
       } catch (error) {
         console.error('Error checking payment status:', error)
-        handleError(error, 'Payment Status Polling')
+        // Don't stop polling on error, just continue
+        if (attempt < maxAttempts) {
+          await delay(1000)
+        }
       }
-    }, 3000)
+    }
+
+    // After max attempts, show "still waiting" instead of timeout
+    // Customer can manually check status using the Check Status button
+    console.log('Polling reached max attempts, switching to manual check mode')
+    showNotification('Payment is taking longer than expected. Please check status manually.', 'info')
+    setLoading(false)
+    setGlobalLoading('checkout.placeOrder', false)
   }
 
   const handleRetryMpesa = async () => {
@@ -384,22 +501,73 @@ const CheckoutPage = () => {
     }
 
     const status = extractPaymentStatus(checkResult.result)
-    const isTerminal = resolvePaymentState(status)
+    console.log('[Manual Check] Payment status:', status)
+    
+    const isTerminal = await resolvePaymentState(status)
 
-    if (!isTerminal) {
+    if (isTerminal && (status === 'completed' || status === 'paid')) {
+      // Payment successful - refresh order data for receipt
+      try {
+        const orderResponse = await orderAPI.getById(orderData.id)
+        console.log('[Manual Check] Refreshed order data:', orderResponse)
+        
+        // Update orderData with fresh data including receipt URL
+        const refreshedOrder = orderResponse?.data?.data || orderResponse?.data || orderResponse
+        if (refreshedOrder?.id) {
+          setOrderData(refreshedOrder)
+          
+          // Set receipt URL if available
+          if (refreshedOrder.receipt_url) {
+            setReceiptUrl(refreshedOrder.receipt_url)
+          }
+        }
+        
+        showNotification('Payment confirmed! Your order is now being processed.', 'success')
+      } catch (err) {
+        console.error('[Manual Check] Failed to refresh order:', err)
+        // Still show success even if refresh fails
+        showNotification('Payment confirmed! Order placed successfully.', 'success')
+      }
+    } else if (!isTerminal) {
       setPaymentStatus('awaiting_confirmation')
-      showNotification('Payment is still pending confirmation. Please approve the STK push.', 'info')
+      showNotification('Payment is still pending confirmation. Please approve the STK push on your phone.', 'info')
     }
   }
 
-  const downloadReceipt = () => {
-    if (receiptUrl) {
-      window.open(`http://localhost:8000${receiptUrl}`, '_blank')
-      return
-    }
-
-    if (orderData?.id) {
-      window.open(`http://localhost:8000/api/orders/${orderData.id}/receipt/`, '_blank')
+  const downloadReceipt = async () => {
+    try {
+      const url = receiptUrl 
+        ? `http://localhost:8000${receiptUrl}` 
+        : `http://localhost:8000/api/v1/orders/${orderData.id}/receipt/`
+      
+      // Fetch the PDF as blob
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to download receipt')
+      }
+      
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      
+      // Create temporary link to trigger download
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `receipt_${orderData.order_number || orderData.id}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Cleanup
+      window.URL.revokeObjectURL(downloadUrl)
+      showNotification('Receipt downloaded successfully!', 'success')
+    } catch (error) {
+      console.error('Failed to download receipt:', error)
+      showNotification('Failed to download receipt. Please try again.', 'error')
     }
   }
 
@@ -681,32 +849,19 @@ const CheckoutPage = () => {
 
                         <div>
                           <label className="block text-sm font-medium text-white mb-4">
-                            Shipping Method
+                            Shipping Zone
                           </label>
-                          <div className="space-y-3">
-                            {shippingOptions.map((option) => (
-                              <label
-                                key={option.id}
-                                className="flex items-center justify-between p-4 rounded-lg bg-white/10 border border-white/20 cursor-pointer hover:bg-white/20 transition-colors"
-                              >
-                                <div className="flex items-center">
-                                  <input
-                                    type="radio"
-                                    name="shipping"
-                                    value={option.id}
-                                    checked={shippingMethod === option.id}
-                                    onChange={(e) => setShippingMethod(e.target.value)}
-                                    className="mr-3"
-                                  />
-                                  <div>
-                                    <p className="text-white font-medium">{option.name}</p>
-                                    <p className="text-gray-200 text-sm">{option.days}</p>
-                                  </div>
-                                </div>
-                                <span className="text-white font-medium">{formatKSH(option.price)}</span>
-                              </label>
+                          <select
+                            value={shippingZone}
+                            onChange={(e) => setShippingZone(e.target.value)}
+                            className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20"
+                          >
+                            {shippingZones.map((zone) => (
+                              <option key={zone.id} value={zone.id} className="bg-gray-900">
+                                {zone.name} - {formatKSH(zone.cost)}
+                              </option>
                             ))}
-                          </div>
+                          </select>
                         </div>
 
                         <AnimatedButton
@@ -721,7 +876,77 @@ const CheckoutPage = () => {
                   </motion.div>
                 )}
 
-                {currentStep === 2 && (
+                {/* Order Success Step */}
+                {orderPlaced && orderData && (
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <GlassCard className="p-8 text-center">
+                      <div className="mb-6">
+                        <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Check className="w-10 h-10 text-white" />
+                        </div>
+                        <h2 className="text-3xl font-bold text-white mb-2">Order Placed Successfully!</h2>
+                        <p className="text-gray-300">
+                          Order #{orderData.order_number || orderData.id}
+                        </p>
+                      </div>
+
+                      <div className="bg-white/10 rounded-lg p-6 mb-6 text-left">
+                        <h3 className="text-lg font-semibold text-white mb-4">Order Summary</h3>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Subtotal:</span>
+                            <span className="text-white">{formatKSH(orderSummary.subtotalBeforeTax)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-300">Shipping:</span>
+                            <span className="text-white">{formatKSH(orderSummary.shipping)}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold pt-2 border-t border-white/20">
+                            <span className="text-white">Total:</span>
+                            <span className="text-white">{formatKSH(orderSummary.total)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        {/* Download Receipt Button */}
+                        <button
+                          onClick={downloadReceipt}
+                          className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:opacity-90 transition-opacity"
+                        >
+                          <Download className="w-5 h-5" />
+                          Download Receipt
+                        </button>
+
+                        {/* Track Order Button */}
+                        <button
+                          onClick={() => navigate(`/customer/orders/${orderData.id}/track`)}
+                          className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+                        >
+                          <Truck className="w-5 h-5" />
+                          Track Order
+                        </button>
+
+                        {/* Continue Shopping */}
+                        <button
+                          onClick={() => navigate('/shop')}
+                          className="flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+                        >
+                          <ShoppingBag className="w-5 h-5" />
+                          Continue Shopping
+                        </button>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
+                )}
+
+                {currentStep === 2 && !orderPlaced && (
                   <motion.div
                     key="payment"
                     initial={{ opacity: 0, x: 50 }}
@@ -988,7 +1213,7 @@ const CheckoutPage = () => {
                   </motion.div>
                 )}
 
-                {currentStep === 3 && (
+                {currentStep === 3 && !orderPlaced && (
                   <motion.div
                     key="review"
                     initial={{ opacity: 0, x: 50 }}
@@ -1119,9 +1344,12 @@ const CheckoutPage = () => {
                         )}
 
                         {paymentStatus === 'timeout' && (
-                          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 text-center space-y-3">
-                            <p className="text-yellow-200 font-medium">Payment Timeout</p>
-                            <p className="text-yellow-300 text-sm">Session expired. You can retry M-Pesa or check if payment completed.</p>
+                          <div className="bg-amber-500/20 border border-amber-500/30 rounded-lg p-4 text-center space-y-3">
+                            <Loader className="w-6 h-6 animate-spin text-amber-300 mx-auto mb-2" />
+                            <p className="text-amber-200 font-medium">Still Waiting for Payment</p>
+                            <p className="text-amber-300 text-sm">
+                              The payment may take a few minutes to process. Click "Check Status" to verify if your payment was received.
+                            </p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                               <AnimatedButton
                                 type="button"
@@ -1135,7 +1363,8 @@ const CheckoutPage = () => {
                                 type="button"
                                 onClick={handleManualPaymentCheck}
                                 disabled={retryingMpesa || checkingPaymentStatus}
-                                className="w-full"
+                                className="w-full bg-gradient-to-r from-blue-500 to-blue-600"
+                                icon={checkingPaymentStatus ? <Loader className="w-4 h-4 animate-spin" /> : null}
                               >
                                 {checkingPaymentStatus ? 'Checking...' : 'Check Status'}
                               </AnimatedButton>
@@ -1186,7 +1415,7 @@ const CheckoutPage = () => {
                       <span className="text-white">{formatKSH(orderSummary.subtotalBeforeTax)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-white">Tax included</span>
+                      <span className="text-white">Tax (0%)</span>
                       <span className="text-white">{formatKSH(orderSummary.tax)}</span>
                     </div>
                     <div className="flex justify-between">

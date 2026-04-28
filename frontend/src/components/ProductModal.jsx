@@ -89,6 +89,16 @@ const ProductModal = ({ product, isOpen, onClose, onAddToCart }) => {
 
   if (!product) return null
 
+  const categoryLabel =
+    typeof product.category === 'string'
+      ? product.category
+      : product.category?.name || product.category?.slug || 'N/A'
+
+  const brandLabel =
+    typeof product.brand === 'string'
+      ? product.brand
+      : product.brand?.name || product.brand?.slug || 'N/A'
+
   // Handle image navigation
   const nextImage = () => {
     const images = [product.image, ...(product.additional_images || [])]
@@ -362,11 +372,11 @@ const ProductModal = ({ product, isOpen, onClose, onAddToCart }) => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-purple-300">Category:</span>
-                        <span className="text-white capitalize">{product.category}</span>
+                        <span className="text-white capitalize">{categoryLabel}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-purple-300">Brand:</span>
-                        <span className="text-white">{product.brand}</span>
+                        <span className="text-white">{brandLabel}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-purple-300">SKU:</span>

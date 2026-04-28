@@ -299,8 +299,50 @@ const ShopPage = () => {
     try {
       setLoading(true)
       const response = await shopAPI.searchProducts(trimmedTerm)
-      const searchResults = response.results || response
-      setProducts(searchResults)
+      const searchResults = response.results || response.data || response
+      const resultsArray = Array.isArray(searchResults) ? searchResults : []
+      
+      // Process search results to match the product format
+      const processedResults = resultsArray.map(product => ({
+        categoryName: product.category?.name || product.category || 'uncategorized',
+        categorySlug: normalizeCategoryKey(product.category?.name || product.category || 'uncategorized'),
+        id: product.id,
+        name: product.name || product.product_name,
+        description: product.description || product.product_description || '',
+        price: product.price || product.selling_price || 0,
+        original_price: product.original_price,
+        discount: product.discount || 0,
+        category: product.category?.name || product.category || 'uncategorized',
+        rating: product.rating || 4,
+        reviews: product.reviews || 0,
+        image: resolveProductImage(product),
+        is_active: product.is_active !== false,
+        stock_quantity: product.stock_quantity || 0,
+        stock_status: product.stock_status || 'out_of_stock',
+        low_stock_threshold: product.low_stock_threshold || 5,
+        expiry_date: product.expiry_date,
+        expiry_status: product.expiry_status,
+        batch_number: product.batch_number,
+        manufactured_date: product.manufactured_date,
+        dealer_info: product.dealer_info || {
+          business_name: product.dealer_name || product.dealer?.business_name || 'Beauty Store',
+          is_verified: product.dealer_verified !== false,
+          business_phone: product.dealer?.business_phone || product.dealer?.user?.phone || '',
+          whatsapp_number: product.dealer?.whatsapp_number || product.dealer?.business_phone || '',
+          business_email: product.dealer?.business_email || product.dealer?.user?.email || '',
+          location: product.dealer?.location || product.dealer?.city || '',
+          full_address: product.dealer?.full_address || '',
+          whatsapp_link: product.dealer?.whatsapp_link || '',
+          email_link: product.dealer?.email_link || ''
+        },
+        brand: product.brand || 'Beauty Brand',
+        sku: product.sku || `SKU-${product.id}`,
+        weight: product.weight || 0,
+        features: product.features || [],
+        last_inventory_update: product.last_stock_update || new Date().toISOString()
+      }))
+      
+      setProducts(processedResults)
     } catch (error) {
       console.error('❌ Failed to search products:', error)
       setProducts([])
@@ -1044,7 +1086,7 @@ const ShopPage = () => {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={() => setShowCompareModal(true)}
-            className={`fixed bottom-24 right-6 z-40 ${colors.primary} text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all flex items-center gap-2`}
+            className={`fixed bottom-24 right-6 z-40 ${currentTheme.button} text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all flex items-center gap-2`}
           >
             <Scale className="w-5 h-5" />
             <span className="font-semibold">{getCompareCount()}</span>

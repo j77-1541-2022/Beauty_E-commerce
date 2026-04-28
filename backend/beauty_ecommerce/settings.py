@@ -5,9 +5,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-beauty-ecommerce-secret-key-change-in-production')
 
-DEBUG = config('DEBUG', default=True, cast=bool)
+def _parse_debug_value(raw_value, default=True):
+    if raw_value is None:
+        return default
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+    if isinstance(raw_value, bool):
+        return raw_value
+
+    normalized = str(raw_value).strip().lower()
+    if normalized in {'1', 'true', 'yes', 'on', 'debug'}:
+        return True
+    if normalized in {'0', 'false', 'no', 'off'}:
+        return False
+
+    return default
+
+
+DEBUG = _parse_debug_value(config('DEBUG', default='True'))
+
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
+
+# Allow temporary ngrok callback hosts during local development.
+if DEBUG:
+    ALLOWED_HOSTS += ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -31,6 +51,7 @@ INSTALLED_APPS = [
     'wishlist',
     'payments',
     'analytics',
+    'dss',
     'dealer',
     'audit',
     'notifications',
@@ -234,6 +255,8 @@ MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')  # Sandbox test sh
 MPESA_PASSKEY = config('MPESA_PASSKEY', default='bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919')
 MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://your-ngrok-url.ngrok-free.app/api/payments/callback/')
 MPESA_ENV = config('MPESA_ENV', default='sandbox')  # 'sandbox' or 'production'
+MPESA_REQUEST_TIMEOUT = config('MPESA_REQUEST_TIMEOUT', default=30, cast=int)
+MPESA_CALLBACK_VALIDATION_KEY = config('MPESA_CALLBACK_VALIDATION_KEY', default='')
 
 # CORS settings for M-Pesa callback
 CORS_ALLOW_ALL_ORIGINS = True  # Temporarily for sandbox testing
@@ -285,12 +308,4 @@ try:
 except ImportError:
     # Fallback to default Channels configuration
     ASGI_APPLICATION = 'beauty_ecommerce.asgi.application'
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                'hosts': [('127.0.0.1', 6379)],
-                'error_on_full_message_queue': True,  # Fix image fallback
-            },
-        },
-    }
+    CHANNEL_LAYERS = {}

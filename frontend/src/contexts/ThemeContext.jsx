@@ -103,6 +103,12 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('beauty-theme', theme)
     const root = document.documentElement
     root.setAttribute('data-theme', theme)
+    // Apply dark/light class to root for Tailwind darkMode: 'class' support
+    if (theme === 'dark') {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
   }, [theme])
 
   const changeTheme = (newTheme) => {
@@ -111,11 +117,20 @@ export const ThemeProvider = ({ children }) => {
     }
   }
 
+  const toggleDarkMode = () => {
+    const isDark = theme === 'dark'
+    changeTheme(isDark ? 'light' : 'dark')
+  }
+
+  const isDark = theme === 'dark'
+
   const value = {
     theme,
     themes,
     colors: themes[theme],
     changeTheme,
+    toggleDarkMode,
+    isDark,
     currentTheme: themes[theme]
   }
 

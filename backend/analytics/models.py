@@ -53,3 +53,40 @@ class InventoryInsight(models.Model):
     
     def __str__(self):
         return f"{self.insight_type} - {self.product.name}"
+
+
+class Forecast(models.Model):
+    product = models.ForeignKey('products.Product', on_delete=models.CASCADE, related_name='forecasts')
+    forecast_date = models.DateField()
+    forecast_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    alpha = models.DecimalField(max_digits=4, decimal_places=2, default=0.30)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['product', 'forecast_date']
+        ordering = ['-forecast_date']
+
+    def __str__(self):
+        return f"Forecast {self.product.name} - {self.forecast_date}"
+
+
+class ABCResult(models.Model):
+    CLASS_CHOICES = [
+        ('A', 'A'),
+        ('B', 'B'),
+        ('C', 'C'),
+    ]
+
+    product = models.ForeignKey('products.Product', on_delete=models.CASCADE, related_name='abc_results')
+    classification = models.CharField(max_length=1, choices=CLASS_CHOICES)
+    sales_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    cumulative_percentage = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"ABC {self.product.name} - {self.classification}"

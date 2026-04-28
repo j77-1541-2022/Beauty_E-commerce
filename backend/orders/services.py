@@ -11,8 +11,11 @@ from typing import List, Dict, Optional
 # Allowed order status transitions
 # Format: current_status -> [allowed_next_statuses]
 ALLOWED_TRANSITIONS = {
-    'pending': ['confirmed', 'cancelled'],
-    'confirmed': ['processing', 'cancelled'],
+    'pending': ['paid', 'confirmed', 'cancelled'],
+    'paid': ['approval_pending', 'approved', 'processing', 'cancelled'],
+    'approval_pending': ['approved', 'cancelled'],
+    'approved': ['processing', 'cancelled'],
+    'confirmed': ['paid', 'processing', 'cancelled'],
     'processing': ['shipped', 'cancelled'],
     'shipped': ['delivered', 'cancelled'],
     'delivered': ['returned'],  # Can't go back, only return
@@ -124,6 +127,30 @@ class OrderStatusManager:
             changed_by=changed_by,
             notes=notes or f'Status changed from {old_status} to {new_status}'
         )
+        
+        # Notify customer of status update
+        try:
+            from notifications.models import Notification
+            status_messages = {
+                'confirmed': f'Your order #{order.order_number} has been confirmed and is being prepared.',
+                'processing': f'Your order #{order.order_number} is now being processed.',
+                'shipped': f'Great news! Your order #{order.order_number} has been shipped and is on its way.',
+                'delivered': f'Your order #{order.order_number} has been delivered. Enjoy your purchase!',
+                'cancelled': f'Your order #{order.order_number} has been cancelled.',
+            }
+            
+            if new_status in status_messages and order.created_by:
+                Notification.objects.create(
+                    user=order.created_by,
+                    title=f'Order {new_status.title()} - #{order.order_number}',
+                    message=status_messages[new_status],
+                    notification_type='order_update',
+                    reference_id=str(order.id)
+                )
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create customer notification for order {order.id}: {e}")
         
         return {
             'success': True,

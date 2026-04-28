@@ -24,4 +24,11 @@ def create_user_profile(sender, instance, created, **kwargs):
 def save_user_profile(sender, instance, **kwargs):
     """Save user profile when user is saved"""
     if hasattr(instance, 'profile'):
-        instance.profile.save()
+        try:
+            instance.profile.save()
+        except Exception as e:
+            # Log error but don't fail the entire save operation
+            # This prevents disk I/O errors from breaking login
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to save user profile for {instance.id}: {e}")

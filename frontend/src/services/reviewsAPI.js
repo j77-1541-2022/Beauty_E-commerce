@@ -1,10 +1,10 @@
-import api from './api'
+import apiClient from './apiClient'
 
 const reviewsAPI = {
   // Get reviews for a product
   getProductReviews: async (productId) => {
     try {
-      const response = await api.get(`/reviews/product_reviews/?product_id=${productId}`)
+      const response = await apiClient.get(`/reviews/product_reviews/?product_id=${productId}`)
       return response
     } catch (error) {
       console.error('❌ Failed to fetch reviews:', error)
@@ -15,7 +15,7 @@ const reviewsAPI = {
   // Create a new review
   createReview: async (productId, rating, title, comment) => {
     try {
-      const response = await api.post('/reviews/', {
+      const response = await apiClient.post('/reviews/', {
         product: productId,
         rating,
         title,
@@ -34,7 +34,7 @@ const reviewsAPI = {
   // Get current user's reviews
   getMyReviews: async () => {
     try {
-      const response = await api.get('/reviews/my_reviews/')
+      const response = await apiClient.get('/reviews/my_reviews/')
       return response
     } catch (error) {
       console.error('❌ Failed to fetch my reviews:', error)
@@ -45,7 +45,7 @@ const reviewsAPI = {
   // Mark review as helpful
   markHelpful: async (reviewId) => {
     try {
-      const response = await api.post(`/reviews/${reviewId}/helpful/`)
+      const response = await apiClient.post(`/reviews/${reviewId}/helpful/`)
       return { success: true, helpful_count: response.helpful_count }
     } catch (error) {
       console.error('❌ Failed to mark helpful:', error)

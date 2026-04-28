@@ -1,10 +1,10 @@
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from django.utils import timezone
-from .models import NotificationPreference, DealerNotification
-from .serializers import NotificationPreferenceSerializer, DealerNotificationSerializer
+from .models import NotificationPreference, DealerNotification, Notification
+from .serializers import NotificationPreferenceSerializer, DealerNotificationSerializer, NotificationSerializer
 from users.models import DealerProfile
 
 
@@ -86,3 +86,77 @@ def mark_all_notifications_read(request):
         return Response({'success': True, 'message': 'All notifications marked as read'})
     except DealerProfile.DoesNotExist:
         return Response({'error': 'Dealer profile not found'}, status=403)
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    """API ViewSet for customer in-app notifications"""
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'delete']
+
+    def get_queryset(self):
+        """Filter notifications to current user only"""
+        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        """GET /api/notifications/ - List user's notifications with unread count"""
+        queryset = self.get_queryset()
+        
+        # Filter by unread if requested
+        unread_only = request.query_params.get('unread', 'false').lower() == 'true'
+        if unread_only:
+            queryset = queryset.filter(is_read=False)
+        
+        # Limit results
+        limit = int(request.query_params.get('limit', 20))
+        queryset = queryset[:limit]
+        
+        serializer = self.get_serializer(queryset, many=True)
+        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        
+        return Response({
+            'notifications': serializer.data,
+            'unread_count': unread_count,
+            'total_count': Notification.objects.filter(user=request.user).count()
+        })
+
+    @action(detail=True, methods=['post'], url_path='mark-as-read')
+    def mark_as_read(self, request, pk=None):
+        """POST /api/notifications/{id}/mark-as-read/ - Mark specific notification as read"""
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save(update_fields=['is_read'])
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='mark-all-as-read')
+    def mark_all_as_read(self, request):
+        """POST /api/notifications/mark-all-as-read/ - Mark all notifications as read"""
+        count = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).update(is_read=True)
+        return Response({
+            'success': True,
+            'message': f'Marked {count} notifications as read'
+        })
+
+    @action(detail=False, methods=['get'], url_path='unread-count')
+    def unread_count(self, request):
+        """GET /api/notifications/unread-count/ - Get count of unread notifications"""
+        count = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).count()
+        return Response({
+            'unread_count': count
+        })
+
+    def destroy(self, request, *args, **kwargs):
+        """DELETE /api/notifications/{id}/ - Delete a notification"""
+        notification = self.get_object()
+        notification.delete()
+        return Response(
+            {'success': True, 'message': 'Notification deleted'},
+            status=status.HTTP_204_NO_CONTENT
+        )

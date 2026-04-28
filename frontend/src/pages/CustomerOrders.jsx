@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Package,
@@ -6,6 +7,7 @@ import {
   CheckCircle,
   Clock,
   ArrowRight,
+  ArrowLeft,
   Calendar,
   DollarSign,
   Filter,
@@ -13,7 +15,8 @@ import {
   X,
   ChevronDown,
   Download,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -46,7 +49,9 @@ const CustomerOrders = () => {
     try {
       setLoading(true)
       const response = await customerAPI.getOrders()
-      const ordersData = Array.isArray(response) ? response : response.results || []
+      const ordersData = Array.isArray(response)
+        ? response
+        : response?.results || response?.data?.results || response?.data || []
       setOrders(ordersData)
     } catch (error) {
       console.error('Failed to fetch orders:', error)
@@ -61,6 +66,55 @@ const CustomerOrders = () => {
     setRefreshing(true)
     await fetchOrders()
     setRefreshing(false)
+  }
+
+  const isWithinWeek = (date) => {
+    if (!date) return false
+    const orderDate = new Date(date)
+    if (Number.isNaN(orderDate.getTime())) return false
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    return orderDate >= weekAgo
+  }
+
+  const isWithinMonth = (date) => {
+    if (!date) return false
+    const orderDate = new Date(date)
+    if (Number.isNaN(orderDate.getTime())) return false
+    const monthAgo = new Date()
+    monthAgo.setMonth(monthAgo.getMonth() - 1)
+    return orderDate >= monthAgo
+  }
+
+  const isWithinYear = (date) => {
+    if (!date) return false
+    const orderDate = new Date(date)
+    if (Number.isNaN(orderDate.getTime())) return false
+    const yearAgo = new Date()
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1)
+    return orderDate >= yearAgo
+  }
+
+  const canDeleteOrder = (order) => {
+    const status = (order?.status || '').toLowerCase()
+    return ['delivered', 'cancelled', 'refunded'].includes(status)
+  }
+
+  const handleDeleteOrder = async (order) => {
+    if (!order?.id) return
+    const confirmed = window.confirm(`Delete order ${order.order_number || order.id} from your history?`)
+    if (!confirmed) return
+
+    try {
+      await customerAPI.deleteOrder(order.id)
+      setOrders((prev) => prev.filter((o) => o.id !== order.id))
+      if (selectedOrder?.id === order.id) {
+        setSelectedOrder(null)
+      }
+    } catch (error) {
+      const message = error?.response?.data?.message || error?.response?.data?.error || 'Failed to delete order.'
+      alert(message)
+    }
   }
 
   const filteredOrders = orders.filter(order => {
@@ -78,27 +132,6 @@ const CustomerOrders = () => {
     return matchesSearch && matchesStatus && matchesDate
   })
 
-  const isWithinWeek = (date) => {
-    const orderDate = new Date(date)
-    const weekAgo = new Date()
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    return orderDate >= weekAgo
-  }
-
-  const isWithinMonth = (date) => {
-    const orderDate = new Date(date)
-    const monthAgo = new Date()
-    monthAgo.setMonth(monthAgo.getMonth() - 1)
-    return orderDate >= monthAgo
-  }
-
-  const isWithinYear = (date) => {
-    const orderDate = new Date(date)
-    const yearAgo = new Date()
-    yearAgo.setFullYear(yearAgo.getFullYear() - 1)
-    return orderDate >= yearAgo
-  }
-
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
       case 'delivered':
@@ -107,6 +140,8 @@ const CustomerOrders = () => {
       case 'shipped':
       case 'in_transit':
         return <Truck className="w-5 h-5 text-blue-500" />
+      case 'paid':
+        return <CheckCircle className="w-5 h-5 text-emerald-500" />
       case 'processing':
       case 'pending':
         return <Clock className="w-5 h-5 text-yellow-500" />
@@ -125,6 +160,8 @@ const CustomerOrders = () => {
       case 'shipped':
       case 'in_transit':
         return 'bg-blue-100 text-blue-800'
+      case 'paid':
+        return 'bg-emerald-100 text-emerald-800'
       case 'processing':
       case 'pending':
         return 'bg-yellow-100 text-yellow-800'
@@ -158,13 +195,19 @@ const CustomerOrders = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 flex items-center justify-between"
         >
-          <div>
-            <h1 className={`text-3xl font-bold ${colors.text}`}>
-              My Orders
-            </h1>
-            <p className={`${colors.textMuted} mt-2`}>
-              Track and manage your orders
-            </p>
+          <div className="flex items-center gap-4">
+            <Link to="/dashboard" className={`flex items-center gap-2 ${colors.textMuted} hover:${colors.text} transition-colors`}>
+              <ArrowLeft className="w-5 h-5" />
+              Back to Dashboard
+            </Link>
+            <div>
+              <h1 className={`text-3xl font-bold ${colors.text}`}>
+                My Orders
+              </h1>
+              <p className={`${colors.textMuted} mt-2`}>
+                Track and manage your orders
+              </p>
+            </div>
           </div>
           <button
             onClick={handleRefresh}
@@ -209,6 +252,7 @@ const CustomerOrders = () => {
                 >
                   <option value="all">All Status</option>
                   <option value="processing">Processing</option>
+                  <option value="paid">Paid</option>
                   <option value="shipped">Shipped</option>
                   <option value="delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>
@@ -321,10 +365,33 @@ const CustomerOrders = () => {
                         </p>
                       </div>
                       
-                      <button className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${colors.primary} text-white hover:opacity-90`}>
-                        <span>View Details</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {order.id && (
+                          <Link
+                            to={`/customer/orders/${order.id}/track`}
+                            className="flex items-center space-x-2 px-4 py-2 rounded-lg border border-blue-400/40 text-blue-600 hover:bg-blue-50 transition-all duration-300"
+                          >
+                            <span>Track Order</span>
+                            <Truck className="w-4 h-4" />
+                          </Link>
+                        )}
+                        <button 
+                          onClick={() => setSelectedOrder(order)}
+                          className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${colors.primary} text-white hover:opacity-90`}
+                        >
+                          <span>View Details</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                        {canDeleteOrder(order) && (
+                          <button
+                            onClick={() => handleDeleteOrder(order)}
+                            className="flex items-center space-x-2 px-4 py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-all duration-300"
+                          >
+                            <span>Delete</span>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </GlassCard>
@@ -333,6 +400,167 @@ const CustomerOrders = () => {
           )}
         </div>
       </div>
+
+      {/* Order Details Modal */}
+      <AnimatePresence>
+        {selectedOrder && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedOrder(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${isDark ? 'bg-gray-800' : 'bg-white'} p-6`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className={`text-2xl font-bold ${colors.text}`}>
+                    Order Details
+                  </h2>
+                  <p className={`${colors.textMuted}`}>
+                    {selectedOrder.order_number || selectedOrder.id}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className={`p-2 rounded-lg hover:${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Order Status */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  {getStatusIcon(selectedOrder.status)}
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.status)}`}>
+                    {(selectedOrder.status || 'Unknown').charAt(0).toUpperCase() + (selectedOrder.status || 'Unknown').slice(1)}
+                  </span>
+                </div>
+                <p className={`text-sm ${colors.textMuted}`}>
+                  Ordered on {new Date(selectedOrder.created_at || selectedOrder.date).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Order Items */}
+              <div className="mb-6">
+                <h3 className={`font-semibold mb-3 ${colors.text}`}>Items</h3>
+                <div className="space-y-3">
+                  {(selectedOrder.items || []).map((item, index) => (
+                    <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <div>
+                        <p className={`font-medium ${colors.text}`}>
+                          {item.product_name || item.name}
+                        </p>
+                        <p className={`text-sm ${colors.textMuted}`}>
+                          Qty: {item.quantity}
+                        </p>
+                      </div>
+                      <p className={`font-medium ${colors.text}`}>
+                        {formatPrice(item.price || item.unit_price)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order Summary */}
+              <div className={`p-4 rounded-lg mb-6 ${isDark ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <h3 className={`font-semibold mb-3 ${colors.text}`}>Order Summary</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className={colors.textMuted}>Subtotal</span>
+                    <span className={colors.text}>{formatPrice((selectedOrder.total_amount || selectedOrder.total || 0) * 0.9)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className={colors.textMuted}>Shipping</span>
+                    <span className={colors.text}>{formatPrice((selectedOrder.total_amount || selectedOrder.total || 0) * 0.1)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold pt-2 border-t">
+                    <span className={colors.text}>Total</span>
+                    <span className={colors.text}>{formatPrice(selectedOrder.total_amount || selectedOrder.total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              {selectedOrder.shipping_address && (
+                <div className="mb-6">
+                  <h3 className={`font-semibold mb-2 ${colors.text}`}>Shipping Address</h3>
+                  <p className={`${colors.textMuted}`}>{selectedOrder.shipping_address}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 flex-wrap">
+                {selectedOrder.id && (
+                  <Link
+                    to={`/customer/orders/${selectedOrder.id}/track`}
+                    onClick={() => setSelectedOrder(null)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Truck className="w-4 h-4" />
+                    Track Order
+                  </Link>
+                )}
+                <button
+                  onClick={async () => {
+                    try {
+                      const orderId = selectedOrder.id
+                      const response = await fetch(`http://localhost:8000/api/v1/orders/${orderId}/receipt/`, {
+                        headers: {
+                          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
+                        }
+                      })
+                      
+                      if (!response.ok) throw new Error('Failed to download')
+                      
+                      const blob = await response.blob()
+                      const url = window.URL.createObjectURL(blob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = `receipt_${selectedOrder.order_number || orderId}.pdf`
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                      window.URL.revokeObjectURL(url)
+                    } catch (error) {
+                      console.error('Failed to download receipt:', error)
+                      alert('Failed to download receipt. Please try again.')
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Receipt
+                </button>
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className={`flex-1 px-4 py-2 rounded-lg border ${isDark ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-100'} transition-colors`}
+                >
+                  Close
+                </button>
+                {canDeleteOrder(selectedOrder) && (
+                  <button
+                    onClick={() => handleDeleteOrder(selectedOrder)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Order
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

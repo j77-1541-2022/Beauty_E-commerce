@@ -6,7 +6,6 @@ from .views import (
     LowStockReportView,
     StockMovementReportView,
     InventoryValuationReportView,
-    DemandForecastView,
     ABCAnalysisView,
     EOQCalculatorView,
     ReorderRecommendationsView,
@@ -24,7 +23,6 @@ urlpatterns = [
     path('stock-movement-report/', StockMovementReportView.as_view(), name='stock-movement-report'),
     path('inventory-valuation-report/', InventoryValuationReportView.as_view(), name='inventory-valuation-report'),
     # DSS endpoints
-    path('demand-forecast/', DemandForecastView.as_view(), name='demand-forecast'),
     path('abc-analysis/', ABCAnalysisView.as_view(), name='abc-analysis'),
     path('eoq-calculator/', EOQCalculatorView.as_view(), name='eoq-calculator'),
     path('reorder-recommendations/', ReorderRecommendationsView.as_view(), name='reorder-recommendations'),

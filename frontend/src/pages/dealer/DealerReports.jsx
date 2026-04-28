@@ -203,8 +203,8 @@ const DealerReports = () => {
           <GlassCard className="p-4 bg-white/95 border border-slate-200 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Inventory Status Report</h2>
-                <p className="text-slate-600">Total Value: {formatKSH(inventoryData.total_value)}</p>
+                <h2 className="text-xl font-bold text-slate-900">Inventory Status Report</h2>
+                <p className="text-slate-800 font-medium">Total Value: {formatKSH(inventoryData.total_value)}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -226,35 +226,35 @@ const DealerReports = () => {
             
             <div id="inventory-table" className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-100">
+                <thead className="bg-gradient-to-r from-slate-100 to-slate-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-slate-700 font-medium">Product Name</th>
-                    <th className="px-4 py-3 text-left text-slate-700 font-medium">Category</th>
-                    <th className="px-4 py-3 text-left text-slate-700 font-medium">SKU</th>
-                    <th className="px-4 py-3 text-center text-slate-700 font-medium">Current Stock</th>
-                    <th className="px-4 py-3 text-center text-slate-700 font-medium">Reorder Level</th>
-                    <th className="px-4 py-3 text-center text-slate-700 font-medium">Status</th>
-                    <th className="px-4 py-3 text-right text-slate-700 font-medium">Value (KES)</th>
+                    <th className="px-4 py-3 text-left text-slate-800 font-bold">Product Name</th>
+                    <th className="px-4 py-3 text-left text-slate-800 font-bold">Category</th>
+                    <th className="px-4 py-3 text-left text-slate-800 font-bold">SKU</th>
+                    <th className="px-4 py-3 text-center text-slate-800 font-bold">Current Stock</th>
+                    <th className="px-4 py-3 text-center text-slate-800 font-bold">Reorder Level</th>
+                    <th className="px-4 py-3 text-center text-slate-800 font-bold">Status</th>
+                    <th className="px-4 py-3 text-right text-slate-800 font-bold">Value (KES)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-slate-200 bg-white">
                   {inventoryData.inventory_data?.map((item, index) => (
-                    <tr key={index} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-900">{item.product_name}</td>
-                      <td className="px-4 py-3 text-slate-600">{item.category}</td>
-                      <td className="px-4 py-3 text-slate-600">{item.sku}</td>
-                      <td className="px-4 py-3 text-center text-slate-900">{item.current_stock}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{item.reorder_level}</td>
+                    <tr key={index} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-slate-900 font-semibold">{item.product_name}</td>
+                      <td className="px-4 py-3 text-slate-700">{item.category}</td>
+                      <td className="px-4 py-3 text-slate-700 font-mono text-sm">{item.sku}</td>
+                      <td className="px-4 py-3 text-center text-slate-900 font-bold">{item.current_stock}</td>
+                      <td className="px-4 py-3 text-center text-slate-700">{item.reorder_level}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          item.status === 'Low' 
-                            ? 'bg-red-500/20 text-red-400' 
-                            : 'bg-emerald-500/20 text-emerald-400'
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          item.status === 'Low'
+                            ? 'bg-red-100 text-red-700 border border-red-300'
+                            : 'bg-emerald-100 text-emerald-700 border border-emerald-300'
                         }`}>
                           {item.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatKSH(item.value_kes)}</td>
+                      <td className="px-4 py-3 text-right text-slate-900 font-bold">{formatKSH(item.value_kes)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -274,11 +274,11 @@ const DealerReports = () => {
           <GlassCard className="p-4 bg-white/95 border border-slate-200 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-red-500" />
                   Low Stock Report
                 </h2>
-                <p className="text-slate-600">{lowStockData.total_low_stock_items} products need attention</p>
+                <p className="text-slate-800 font-medium">{lowStockData.total_low_stock_items} products need attention</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -300,31 +300,31 @@ const DealerReports = () => {
             
             <div id="lowstock-table" className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-red-500/10">
+                <thead className="bg-gradient-to-r from-red-200 to-red-300">
                   <tr>
-                    <th className="px-4 py-3 text-left text-red-300 font-medium">Product Name</th>
-                    <th className="px-4 py-3 text-left text-red-300 font-medium">Category</th>
-                    <th className="px-4 py-3 text-left text-red-300 font-medium">SKU</th>
-                    <th className="px-4 py-3 text-center text-red-300 font-medium">Current Stock</th>
-                    <th className="px-4 py-3 text-center text-red-300 font-medium">Reorder Level</th>
-                    <th className="px-4 py-3 text-center text-red-300 font-medium">Suggested Reorder</th>
-                    <th className="px-4 py-3 text-left text-red-300 font-medium">Supplier Contact</th>
+                    <th className="px-4 py-3 text-left text-red-900 font-bold">Product Name</th>
+                    <th className="px-4 py-3 text-left text-red-900 font-bold">Category</th>
+                    <th className="px-4 py-3 text-left text-red-900 font-bold">SKU</th>
+                    <th className="px-4 py-3 text-center text-red-900 font-bold">Current Stock</th>
+                    <th className="px-4 py-3 text-center text-red-900 font-bold">Reorder Level</th>
+                    <th className="px-4 py-3 text-center text-red-900 font-bold">Suggested Reorder</th>
+                    <th className="px-4 py-3 text-left text-red-900 font-bold">Supplier Contact</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-red-500/10">
+                <tbody className="divide-y divide-red-200 bg-white">
                   {lowStockData.low_stock_data?.map((item, index) => (
-                    <tr key={index} className="hover:bg-red-500/5">
-                      <td className="px-4 py-3 text-slate-900 font-medium">{item.product_name}</td>
-                      <td className="px-4 py-3 text-slate-600">{item.category}</td>
-                      <td className="px-4 py-3 text-slate-600">{item.sku}</td>
-                      <td className="px-4 py-3 text-center text-red-400 font-bold">{item.current_stock}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{item.reorder_level}</td>
+                    <tr key={index} className="hover:bg-red-50 transition-colors">
+                      <td className="px-4 py-3 text-slate-900 font-semibold">{item.product_name}</td>
+                      <td className="px-4 py-3 text-slate-700">{item.category}</td>
+                      <td className="px-4 py-3 text-slate-700 font-mono text-sm">{item.sku}</td>
+                      <td className="px-4 py-3 text-center text-red-700 font-bold">{item.current_stock}</td>
+                      <td className="px-4 py-3 text-center text-slate-700">{item.reorder_level}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-sm font-medium">
+                        <span className="px-3 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-full text-xs font-bold">
                           {item.suggested_reorder} units
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{item.supplier_contact}</td>
+                      <td className="px-4 py-3 text-slate-700">{item.supplier_contact}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -350,7 +350,7 @@ const DealerReports = () => {
         >
           <GlassCard className="p-4 bg-white/95 border border-slate-200 shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-blue-500" />
                 Stock Movement Report
               </h2>
@@ -417,40 +417,40 @@ const DealerReports = () => {
                 
                 {/* Transactions Table */}
                 <div className="overflow-x-auto">
-                  <h3 className="text-lg font-medium text-slate-900 mb-3">Recent Transactions</h3>
+                  <h3 className="text-lg font-medium text-blue-900 mb-3">Recent Transactions</h3>
                   <table className="w-full">
-                    <thead className="bg-slate-100">
+                    <thead className="bg-gradient-to-r from-blue-200 to-blue-300">
                       <tr>
-                        <th className="px-4 py-3 text-left text-slate-700 font-medium">Date</th>
-                        <th className="px-4 py-3 text-left text-slate-700 font-medium">Product</th>
-                        <th className="px-4 py-3 text-center text-slate-700 font-medium">Type</th>
-                        <th className="px-4 py-3 text-center text-slate-700 font-medium">Quantity</th>
-                        <th className="px-4 py-3 text-center text-slate-700 font-medium">Before</th>
-                        <th className="px-4 py-3 text-center text-slate-700 font-medium">After</th>
-                        <th className="px-4 py-3 text-left text-slate-700 font-medium">Reference</th>
+                        <th className="px-4 py-3 text-left text-blue-900 font-bold">Date</th>
+                        <th className="px-4 py-3 text-left text-blue-900 font-bold">Product</th>
+                        <th className="px-4 py-3 text-center text-blue-900 font-bold">Type</th>
+                        <th className="px-4 py-3 text-center text-blue-900 font-bold">Quantity</th>
+                        <th className="px-4 py-3 text-center text-blue-900 font-bold">Before</th>
+                        <th className="px-4 py-3 text-center text-blue-900 font-bold">After</th>
+                        <th className="px-4 py-3 text-left text-blue-900 font-bold">Reference</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
+                    <tbody className="divide-y divide-blue-200 bg-white">
                       {movementData.transactions?.slice(0, 20).map((tx, index) => (
-                        <tr key={index} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-slate-600 text-sm">
+                        <tr key={index} className="hover:bg-blue-50 transition-colors">
+                          <td className="px-4 py-3 text-slate-700 text-sm">
                             {new Date(tx.created_at).toLocaleDateString('en-KE')}
                           </td>
-                          <td className="px-4 py-3 text-slate-900">{tx.dealer_inventory__product__name}</td>
+                          <td className="px-4 py-3 text-slate-900 font-semibold">{tx.dealer_inventory__product__name}</td>
                           <td className="px-4 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              tx.movement_type === 'in' ? 'bg-emerald-500/20 text-emerald-400' :
-                              tx.movement_type === 'sale' ? 'bg-purple-500/20 text-purple-400' :
-                              tx.movement_type === 'out' ? 'bg-red-500/20 text-red-400' :
-                              'bg-amber-500/20 text-amber-400'
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              tx.movement_type === 'in' ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' :
+                              tx.movement_type === 'sale' ? 'bg-purple-100 text-purple-700 border border-purple-300' :
+                              tx.movement_type === 'out' ? 'bg-red-100 text-red-700 border border-red-300' :
+                              'bg-amber-100 text-amber-700 border border-amber-300'
                             }`}>
                               {tx.movement_type}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-center text-slate-900">{tx.quantity}</td>
-                          <td className="px-4 py-3 text-center text-slate-600">{tx.quantity_before}</td>
-                          <td className="px-4 py-3 text-center text-slate-900">{tx.quantity_after}</td>
-                          <td className="px-4 py-3 text-slate-600 text-sm">{tx.reference || '-'}</td>
+                          <td className="px-4 py-3 text-center text-slate-900 font-bold">{tx.quantity}</td>
+                          <td className="px-4 py-3 text-center text-slate-700">{tx.quantity_before}</td>
+                          <td className="px-4 py-3 text-center text-slate-900 font-bold">{tx.quantity_after}</td>
+                          <td className="px-4 py-3 text-slate-700 text-sm">{tx.reference || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -476,7 +476,7 @@ const DealerReports = () => {
           className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         >
           <GlassCard className="p-4 bg-white/95 border border-slate-200 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
               <PieIcon className="w-5 h-5 text-purple-500" />
               Inventory Value by Category
             </h2>
@@ -506,21 +506,21 @@ const DealerReports = () => {
               </ResponsiveContainer>
             </div>
             
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
               <div className="flex justify-between items-center">
-                <span className="text-slate-600">Total Inventory Value</span>
-                <span className="text-2xl font-bold text-slate-900">{formatKSH(valuationData.total_value_kes)}</span>
+                <span className="text-purple-900 font-semibold">Total Inventory Value</span>
+                <span className="text-2xl font-bold text-purple-700">{formatKSH(valuationData.total_value_kes)}</span>
               </div>
               <div className="flex justify-between items-center mt-2">
-                <span className="text-slate-600">Total Products</span>
-                <span className="text-lg font-medium text-slate-900">{valuationData.total_products} items</span>
+                <span className="text-purple-800 font-medium">Total Products</span>
+                <span className="text-lg font-bold text-purple-700">{valuationData.total_products} items</span>
               </div>
             </div>
           </GlassCard>
           
           <GlassCard className="p-4 bg-white/95 border border-slate-200 shadow-sm">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-slate-900">Category Breakdown</h2>
+              <h2 className="text-xl font-bold text-slate-900">Category Breakdown</h2>
               <button
                 onClick={() => exportToCSV(valuationData.category_breakdown, 'valuation_report.csv')}
                 className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition-colors text-sm"
@@ -532,28 +532,28 @@ const DealerReports = () => {
             
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-100">
+                <thead className="bg-gradient-to-r from-purple-200 to-purple-300">
                   <tr>
-                    <th className="px-4 py-3 text-left text-slate-700 font-medium">Category</th>
-                    <th className="px-4 py-3 text-center text-slate-700 font-medium">Items</th>
-                    <th className="px-4 py-3 text-right text-slate-700 font-medium">Value (KES)</th>
-                    <th className="px-4 py-3 text-right text-slate-700 font-medium">%</th>
+                    <th className="px-4 py-3 text-left text-purple-900 font-bold">Category</th>
+                    <th className="px-4 py-3 text-center text-purple-900 font-bold">Items</th>
+                    <th className="px-4 py-3 text-right text-purple-900 font-bold">Value (KES)</th>
+                    <th className="px-4 py-3 text-right text-purple-900 font-bold">%</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-purple-200 bg-white">
                   {valuationData.category_breakdown?.map((cat, index) => (
-                    <tr key={index} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-900 flex items-center gap-2">
-                        <div 
+                    <tr key={index} className="hover:bg-purple-50 transition-colors">
+                      <td className="px-4 py-3 text-slate-900 font-semibold flex items-center gap-2">
+                        <div
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: COLORS[index % COLORS.length] }}
                         />
                         {cat.category}
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-600">{cat.item_count}</td>
-                      <td className="px-4 py-3 text-right text-slate-900">{formatKSH(cat.total_value_kes)}</td>
+                      <td className="px-4 py-3 text-center text-slate-700">{cat.item_count}</td>
+                      <td className="px-4 py-3 text-right text-slate-900 font-bold">{formatKSH(cat.total_value_kes)}</td>
                       <td className="px-4 py-3 text-right">
-                        <span className="px-2 py-1 bg-slate-100 rounded text-sm text-slate-700">
+                        <span className="px-3 py-1 bg-purple-100 rounded-full text-sm font-bold text-purple-700 border border-purple-300">
                           {cat.percentage}%
                         </span>
                       </td>

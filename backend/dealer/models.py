@@ -426,3 +426,32 @@ class DecisionSupportMetric(models.Model):
                         'trend_direction': 'up'
                     }
                 )
+
+
+class Payout(models.Model):
+    """
+    Track dealer payouts/commissions sent via M-Pesa
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    dealer = models.ForeignKey(DealerProfile, on_delete=models.CASCADE, related_name='payouts')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    mpesa_receipt_number = models.CharField(max_length=50, blank=True, null=True)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    failure_reason = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = 'Payouts'
+    
+    def __str__(self):
+        return f"{self.dealer.business_name} - KSh {self.amount} ({self.status})"

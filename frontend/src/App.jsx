@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -9,13 +9,14 @@ import { CartProvider } from './contexts/CartContext'
 import { WishlistProvider } from './contexts/WishlistContext'
 import { CompareProvider } from './contexts/CompareContext'
 import { CurrencyProvider } from './contexts/CurrencyContext'
-import { ThemeProvider } from './contexts/ThemeContext'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { ErrorHandlerProvider } from './contexts/ErrorHandlerContext'
 
 // Components
 import ErrorBoundary from './components/errors/ErrorBoundary'
 import ErrorToast from './components/ErrorToast'
+import Footer from './components/Footer'
 import { 
   ProtectedRoute, AdminRoute, DealerRoute, CustomerRoute, PublicOnlyRoute 
 } from './components/auth/RouteGuards'
@@ -39,15 +40,14 @@ const DSSDashboard = lazy(() => import('./pages/admin/DSSDashboard'))
 // Dealer Pages
 const DealerLayout = lazy(() => import('./pages/dealer/DealerLayout'))
 const DealerDashboard = lazy(() => import('./pages/dealer/DealerDashboard'))
-const DealerOrders = lazy(() => import('./pages/dealer/DealerOrders'))
+const DealerOrders = lazy(() => import('./pages/dealer/DealerOrdersManagement'))
 const DealerProducts = lazy(() => import('./pages/dealer/DealerProducts'))
 const DealerInventory = lazy(() => import('./pages/dealer/DealerInventory'))
 const DealerEarnings = lazy(() => import('./pages/dealer/DealerEarnings'))
 const DealerProfile = lazy(() => import('./pages/dealer/DealerProfile'))
-const DealerReports = lazy(() => import('./pages/dealer/DealerReports'))
 const DealerAnalytics = lazy(() => import('./pages/dealer/DealerAnalytics'))
 const DealerVerificationPending = lazy(() => import('./pages/dealer/DealerVerificationPending'))
-const InventoryReports = lazy(() => import('./pages/dealer/InventoryReports'))
+const DealerReportsCenter = lazy(() => import('./pages/dealer/DealerReportsCenter'))
 const DSSInsights = lazy(() => import('./pages/dealer/DSSInsights'))
 
 // Customer Pages
@@ -55,9 +55,11 @@ const HomePage = lazy(() => import('./pages/HomePage'))
 const ShopPage = lazy(() => import('./pages/ShopPage'))
 const CartPage = lazy(() => import('./pages/CartPage'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
-const CustomerDashboard = lazy(() => import('./pages/EnhancedCustomerDashboard'))
+const CustomerDashboard = lazy(() => import('./pages/CustomerAccountDashboard'))
 const CustomerOrders = lazy(() => import('./pages/CustomerOrders'))
 const WishlistPage = lazy(() => import('./pages/WishlistPage'))
+const ComparisonPage = lazy(() => import('./pages/ComparisonPage'))
+const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
 const ProductDetailsPage = lazy(() => import('./pages/ProductDetailsPage'))
 const DealerStorePage = lazy(() => import('./pages/DealerStorePage'))
 const InfoCenterPage = lazy(() => import('./pages/InfoCenterPage'))
@@ -78,6 +80,21 @@ const PageWrapper = ({ children }) => (
     </motion.div>
   </PageTransition>
 )
+
+// Apply theme class to root element
+const ThemeApplier = ({ children }) => {
+  const { isDark } = useTheme()
+  
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [isDark])
+  
+  return children
+}
 
 function AppRoutes() {
   return (
@@ -137,12 +154,11 @@ function AppRoutes() {
             </Suspense>
           </CustomerRoute>
         } />
+        {/* Cart - Public (guests can view cart) */}
         <Route path="/cart" element={
-          <CustomerRoute>
-            <Suspense fallback={<LoadingScreen />}>
-              <PageWrapper><CartPage /></PageWrapper>
-            </Suspense>
-          </CustomerRoute>
+          <Suspense fallback={<LoadingScreen />}>
+            <PageWrapper><CartPage /></PageWrapper>
+          </Suspense>
         } />
         <Route path="/checkout" element={
           <CustomerRoute>
@@ -158,12 +174,24 @@ function AppRoutes() {
             </Suspense>
           </CustomerRoute>
         } />
+        <Route path="/customer/orders/:id/track" element={
+          <CustomerRoute>
+            <Suspense fallback={<LoadingScreen />}>
+              <PageWrapper><OrderTrackingPage /></PageWrapper>
+            </Suspense>
+          </CustomerRoute>
+        } />
         <Route path="/wishlist" element={
           <CustomerRoute>
             <Suspense fallback={<LoadingScreen />}>
               <PageWrapper><WishlistPage /></PageWrapper>
             </Suspense>
           </CustomerRoute>
+        } />
+        <Route path="/compare" element={
+          <Suspense fallback={<LoadingScreen />}>
+            <PageWrapper><ComparisonPage /></PageWrapper>
+          </Suspense>
         } />
 
         {/* Admin Routes */}
@@ -243,7 +271,7 @@ function AppRoutes() {
           } />
           <Route path="reports" element={
             <Suspense fallback={<LoadingScreen />}>
-              <PageWrapper><DealerReports /></PageWrapper>
+              <PageWrapper><DealerReportsCenter /></PageWrapper>
             </Suspense>
           } />
           <Route path="analytics" element={
@@ -257,9 +285,7 @@ function AppRoutes() {
             </Suspense>
           } />
           <Route path="inventory-reports" element={
-            <Suspense fallback={<LoadingScreen />}>
-              <DealerRoute><InventoryReports /></DealerRoute>
-            </Suspense>
+            <Navigate to="/dealer/reports" replace />
           } />
           <Route path="dss-insights" element={
             <Suspense fallback={<LoadingScreen />}>
@@ -290,27 +316,32 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <CurrencyProvider>
-          <AuthProvider>
-            <NotificationProvider>
-              <ErrorHandlerProvider>
-                <CustomerAuthProvider>
-                  <CartProvider>
-                    <WishlistProvider>
-                      <CompareProvider>
-                        <div className="min-h-screen bg-gray-50">
-                          <AppRoutes />
-                          <GlobalLoadingOverlay />
-                          <ErrorToast />
-                        </div>
-                      </CompareProvider>
-                    </WishlistProvider>
-                  </CartProvider>
-                </CustomerAuthProvider>
-              </ErrorHandlerProvider>
-            </NotificationProvider>
-          </AuthProvider>
-        </CurrencyProvider>
+        <ThemeApplier>
+          <CurrencyProvider>
+            <AuthProvider>
+              <NotificationProvider>
+                <ErrorHandlerProvider>
+                  <CustomerAuthProvider>
+                    <CartProvider>
+                      <WishlistProvider>
+                        <CompareProvider>
+                          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col transition-colors duration-300">
+                            <div className="flex-1">
+                              <AppRoutes />
+                            </div>
+                            <Footer />
+                            <GlobalLoadingOverlay />
+                            <ErrorToast />
+                          </div>
+                        </CompareProvider>
+                      </WishlistProvider>
+                    </CartProvider>
+                  </CustomerAuthProvider>
+                </ErrorHandlerProvider>
+              </NotificationProvider>
+            </AuthProvider>
+          </CurrencyProvider>
+        </ThemeApplier>
       </ThemeProvider>
     </ErrorBoundary>
   )

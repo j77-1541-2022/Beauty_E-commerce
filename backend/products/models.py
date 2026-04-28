@@ -104,24 +104,47 @@ class Product(models.Model):
         return self.discount > 0 and self.original_price
     
     def get_inventory_status(self):
-        """Get current inventory status"""
+        """Get current inventory status - includes both global and dealer inventory"""
+        total_stock = 0
+        stock_status = 'out_of_stock'
+        last_updated = timezone.now()
+        
         try:
-            # Try to get from inventory app
+            # Try to get from global inventory app
             inventory = self.inventory_set.first()
             if inventory:
-                return {
-                    'stock_quantity': inventory.stock_quantity,
-                    'stock_status': inventory.stock_status,
-                    'low_stock_threshold': getattr(inventory, 'low_stock_threshold', 5),
-                    'last_updated': getattr(inventory, 'last_updated', timezone.now())
-                }
+                total_stock += inventory.stock_quantity
+                last_updated = getattr(inventory, 'last_updated', timezone.now())
         except:
             pass
+        
+        try:
+            # Also aggregate from all dealer inventories
+            from dealer.models import DealerInventory
+            dealer_inventories = DealerInventory.objects.filter(product=self)
+            if dealer_inventories.exists():
+                dealer_stock = sum(di.stock_quantity for di in dealer_inventories)
+                total_stock += dealer_stock
+                # Get most recent update time
+                latest_update = max(di.last_stock_update for di in dealer_inventories if di.last_stock_update)
+                if latest_update and latest_update > last_updated:
+                    last_updated = latest_update
+        except:
+            pass
+        
+        # Determine stock status based on total
+        if total_stock == 0:
+            stock_status = 'out_of_stock'
+        elif total_stock <= 5:  # low_stock_threshold
+            stock_status = 'low_stock'
+        else:
+            stock_status = 'in_stock'
+        
         return {
-            'stock_quantity': 0,
-            'stock_status': 'out_of_stock',
+            'stock_quantity': total_stock,
+            'stock_status': stock_status,
             'low_stock_threshold': 5,
-            'last_updated': timezone.now()
+            'last_updated': last_updated
         }
     
     @property

@@ -77,7 +77,12 @@ export const LoginPage = () => {
             transition={{ delay: 0.3 }}
           >
             <GlassCard className={`login-card ${shake ? 'shake' : ''}`} elevated>
-              <h2>Welcome Back</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2>Welcome Back</h2>
+                <Link to="/shop" className="text-sm text-gray-500 hover:text-gray-700">
+                  Back to Home
+                </Link>
+              </div>
               <p>Sign in to your account to continue</p>
 
               {error && (

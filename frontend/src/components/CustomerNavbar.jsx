@@ -6,19 +6,25 @@ import {
   User, 
   LogOut, 
   Menu,
-  X
+  X,
+  Scale,
+  Moon,
+  Sun
 } from 'lucide-react'
 import { useCustomerAuth } from '../contexts/CustomerAuthContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCart } from '../contexts/CartContext'
+import { useCompare } from '../contexts/CompareContext'
 import { useTheme } from '../contexts/ThemeContext'
 
 const CustomerNavbar = () => {
   const { user, logout, isAuthenticated } = useCustomerAuth()
   const { getDashboardRoute } = useAuth()
   const { getCartCount } = useCart()
-  const { colors } = useTheme()
+  const { compareList } = useCompare()
+  const { colors, toggleDarkMode, isDark } = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
 
   const isActive = (path) => location.pathname === path
@@ -90,7 +96,32 @@ const CustomerNavbar = () => {
                     </span>
                   )}
                 </Link>
+                <Link
+                  to="/compare"
+                  className={`relative transition-colors ${
+                    isActive('/compare') ? `${colors.accent} font-semibold` : `${colors.text} hover:${colors.accent}`
+                  }`}
+                  title="Compare Products"
+                >
+                  <Scale className="w-6 h-6" />
+                  {compareList.length > 0 && (
+                    <span className={`absolute -top-2 -right-2 ${colors.primary} text-white text-xs rounded-full h-5 w-5 flex items-center justify-center`}>
+                      {compareList.length}
+                    </span>
+                  )}
+                </Link>
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={toggleDarkMode}
+                    className={`p-2 rounded-lg transition-all ${
+                      isDark 
+                        ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' 
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    }`}
+                    title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                  >
+                    {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                  </button>
                   <span className={`text-sm ${colors.textMuted}`}>Hi, {user?.first_name || user?.username}</span>
                   <button
                     onClick={() => {
@@ -124,7 +155,18 @@ const CustomerNavbar = () => {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={toggleDarkMode}
+              className={`p-2 rounded-lg transition-all ${
+                isDark 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' 
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+              }`}
+              title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 text-gray-700 hover:text-purple-600 transition-colors"
@@ -181,8 +223,28 @@ const CustomerNavbar = () => {
                   >
                     Cart
                   </Link>
-                  <div className="flex items-center justify-between pt-4 border-t">
+                  <Link
+                    to="/compare"
+                    className={`text-gray-700 hover:text-purple-600 transition-colors ${
+                      isActive('/compare') ? 'text-purple-600 font-semibold' : ''
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Compare ({compareList.length})
+                  </Link>
+                  <div className="flex items-center justify-between pt-4 border-t gap-4">
                     <span className="text-sm text-gray-600">Hi, {user?.first_name || user?.username}</span>
+                    <button
+                      onClick={toggleDarkMode}
+                      className={`p-2 rounded-lg transition-all ${
+                        isDark 
+                          ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' 
+                          : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      }`}
+                      title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                    >
+                      {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                    </button>
                     <button
                       onClick={() => {
                         logout()

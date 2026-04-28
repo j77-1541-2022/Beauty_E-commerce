@@ -17,8 +17,11 @@ export const ErrorHandlerProvider = ({ children }) => {
   const handleError = useCallback((error, context = 'Operation') => {
     console.error(`[${context}] Error:`, error)
     
-    const errorMessage = error?.response?.data?.detail || 
-                       error?.response?.data?.message || 
+    // Check for custom API response format: { success: false, message: "...", error: { code, message } }
+    const responseData = error?.response?.data
+    const errorMessage = responseData?.error?.message || 
+                       responseData?.message || 
+                       responseData?.detail || 
                        error?.message || 
                        'An unexpected error occurred'
     
@@ -26,6 +29,7 @@ export const ErrorHandlerProvider = ({ children }) => {
       message: errorMessage,
       context,
       status: error?.response?.status,
+      code: responseData?.error?.code,
       timestamp: new Date().toISOString()
     })
 

@@ -108,7 +108,7 @@ export const customerAPI = {
   // Get customer orders
   getOrders: async () => {
     try {
-      const response = await api.get('/orders/')
+      const response = await api.get('/v1/orders/')
       return response.data
     } catch (error) {
       console.error('Orders fetch error:', error)
@@ -128,6 +128,21 @@ export const customerAPI = {
       return response.data
     } catch (error) {
       console.error('Order details fetch error:', error)
+      if (error.response?.status === 401) {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        window.location.href = '/login'
+      }
+      throw error
+    }
+  },
+
+  // Delete customer order from history (only terminal states allowed by backend)
+  deleteOrder: async (orderId) => {
+    try {
+      const response = await api.delete(`/v1/orders/${orderId}/`)
+      return response.data
+    } catch (error) {
       if (error.response?.status === 401) {
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')

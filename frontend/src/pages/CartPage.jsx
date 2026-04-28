@@ -66,6 +66,13 @@ const CartPage = () => {
       alert('Your cart is empty!')
       return
     }
+
+    // Check if user is logged in
+    if (!user) {
+      localStorage.setItem('redirectAfterLogin', '/checkout')
+      navigate('/login')
+      return
+    }
     
     // Navigate to checkout with cart data
     navigate('/checkout', { state: { cartItems, cartTotal: getCartTotal() } })

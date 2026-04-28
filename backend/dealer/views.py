@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.db.models import F, Q, Sum
@@ -31,6 +32,8 @@ from .serializers import (
     DealerSalesAnalyticsSerializer,
     DecisionSupportMetricSerializer,
 )
+
+COMPLETED_ORDER_STATUSES = ['delivered']
 
 class DealerViewSet(viewsets.ViewSet):
     """ViewSet for dealer operations"""
@@ -67,6 +70,23 @@ class DealerViewSet(viewsets.ViewSet):
         dealer_profile = self._get_dealer_profile(request)
         return Product.objects.filter(dealer=dealer_profile)
 
+    def _calculate_pending_payout(self, dealer_profile):
+        """Calculate dynamic pending payout from delivered orders minus paid-out earnings."""
+        completed_orders = Order.objects.filter(
+            items__product__dealer=dealer_profile,
+            status__in=COMPLETED_ORDER_STATUSES,
+        ).distinct()
+
+        total_revenue = Decimal('0.00')
+        for order in completed_orders:
+            for item in order.items.filter(product__dealer=dealer_profile):
+                total_revenue += item.quantity * item.unit_price
+
+        commission_rate = dealer_profile.commission_rate / Decimal('100')
+        total_earnings = total_revenue * (Decimal('1.00') - commission_rate)
+        pending_payout = total_earnings - dealer_profile.total_earnings
+        return max(Decimal('0.00'), pending_payout)
+
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
         """Get dealer dashboard with key statistics."""
@@ -79,21 +99,29 @@ class DealerViewSet(viewsets.ViewSet):
         
         total_orders = orders.count()
         pending_orders = orders.filter(status__in=['pending', 'processing']).count()
-        completed_orders = orders.filter(status='completed').count()
+        completed_orders = orders.filter(status__in=COMPLETED_ORDER_STATUSES).count()
         
-        # Calculate revenue for this month
+        # Calculate revenue for this month (delivered orders only)
         month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        month_items = order_items.filter(order__created_at__gte=month_start)
+        month_items = order_items.filter(
+            order__created_at__gte=month_start,
+            order__status__in=COMPLETED_ORDER_STATUSES
+        )
+        month_revenue_gross = sum(
+            item.quantity * item.unit_price
+            for item in month_items
+        )
         month_revenue = sum(
             item.quantity * (item.unit_price * (1 - profile.commission_rate / 100))
             for item in month_items
         )
         
-        # Calculate last month revenue for growth
+        # Calculate last month revenue for growth (delivered orders only)
         last_month_start = (month_start - timedelta(days=1)).replace(day=1)
         last_month_items = order_items.filter(
             order__created_at__gte=last_month_start,
-            order__created_at__lt=month_start
+            order__created_at__lt=month_start,
+            order__status__in=COMPLETED_ORDER_STATUSES
         )
         last_month_revenue = sum(
             item.quantity * (item.unit_price * (1 - profile.commission_rate / 100))
@@ -105,9 +133,10 @@ class DealerViewSet(viewsets.ViewSet):
             if last_month_revenue > 0 else 0
         )
         
-        # Top 5 products by sales
+        # Top 5 products by delivered sales
         top_products = (
-            order_items.values('product__id', 'product__name')
+            order_items.filter(order__status__in=COMPLETED_ORDER_STATUSES)
+            .values('product__id', 'product__name')
             .annotate(total_sold=Sum('quantity'))
             .order_by('-total_sold')[:5]
         )
@@ -139,8 +168,9 @@ class DealerViewSet(viewsets.ViewSet):
                 'total_orders': total_orders,
                 'pending_orders': pending_orders,
                 'completed_orders': completed_orders,
+                'total_sales_ksh': round(float(month_revenue_gross), 2),
                 'total_revenue_ksh': round(float(month_revenue), 2),
-                'pending_payout_ksh': float(profile.pending_payout),
+                'pending_payout_ksh': float(self._calculate_pending_payout(profile)),
                 'products_listed': dealer_products.filter(is_active=True).count(),
                 'sales_growth_percent': round(float(sales_growth_percent), 1)
             },
@@ -465,6 +495,107 @@ class DealerViewSet(viewsets.ViewSet):
         
         return Response(data)
 
+    @action(detail=True, methods=['patch'], url_path='order_status')
+    def order_status(self, request, pk=None):
+        """Update status for a single dealer-related order."""
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'error': 'status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_statuses = [choice[0] for choice in Order.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response(
+                {'error': f'Invalid status. Valid options: {", ".join(valid_statuses)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        dealer_products = self._get_dealer_products(request)
+        try:
+            order = Order.objects.filter(items__product__in=dealer_products).distinct().get(id=pk)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        old_status = order.status
+        order.status = new_status
+        order.save(update_fields=['status', 'updated_at'])
+
+        from orders.models import OrderStatusHistory
+        OrderStatusHistory.objects.create(
+            order=order,
+            old_status=old_status,
+            new_status=new_status,
+            changed_by=request.user,
+            notes=f'Status updated by dealer {request.user.username}'
+        )
+
+        return Response({
+            'success': True,
+            'order_id': order.id,
+            'old_status': old_status,
+            'new_status': new_status
+        })
+
+    @action(detail=False, methods=['patch'])
+    def bulk_update_status(self, request):
+        """Bulk update order statuses for dealer's orders."""
+        order_ids = request.data.get('order_ids', [])
+        new_status = request.data.get('status')
+        
+        if not order_ids or not new_status:
+            return Response(
+                {'error': 'order_ids and status are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate new_status
+        valid_statuses = [choice[0] for choice in Order.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response(
+                {'error': f'Invalid status. Valid options: {", ".join(valid_statuses)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        dealer_products = self._get_dealer_products(request)
+        dealer_order_ids = set(
+            Order.objects.filter(items__product__in=dealer_products).distinct().values_list('id', flat=True)
+        )
+        
+        # Only update orders that contain dealer's products
+        order_ids_to_update = [oid for oid in order_ids if oid in dealer_order_ids]
+        
+        if not order_ids_to_update:
+            return Response(
+                {'error': 'No valid dealer orders found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated_count = 0
+        for order_id in order_ids_to_update:
+            try:
+                order = Order.objects.get(id=order_id)
+                old_status = order.status
+                order.status = new_status
+                order.save()
+                
+                # Record status history
+                from orders.models import OrderStatusHistory
+                OrderStatusHistory.objects.create(
+                    order=order,
+                    old_status=old_status,
+                    new_status=new_status,
+                    changed_by=request.user,
+                    notes=f'Bulk update by dealer {request.user.username}'
+                )
+                updated_count += 1
+            except Order.DoesNotExist:
+                continue
+        
+        return Response({
+            'success': True,
+            'message': f'Updated {updated_count} order(s)',
+            'updated_count': updated_count
+        })
+
     @action(detail=False, methods=['get'])
     def analytics(self, request):
         """Get sales analytics."""
@@ -582,18 +713,18 @@ class DealerViewSet(viewsets.ViewSet):
         # Get current month
         now = timezone.now()
         current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        current_month_end = (current_month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        next_month_start = (current_month_start + timedelta(days=32)).replace(day=1)
         
         # Get last month
-        last_month_end = current_month_start - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_month_start = (current_month_start - timedelta(days=1)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_month_end_exclusive = current_month_start
         
         # Calculate current month earnings
         current_month_orders = Order.objects.filter(
             items__product__dealer=dealer_profile,
             created_at__gte=current_month_start,
-            created_at__lte=current_month_end,
-            status__in=['completed', 'shipped']
+            created_at__lt=next_month_start,
+            status__in=COMPLETED_ORDER_STATUSES
         ).distinct()
         
         current_month_revenue = sum(
@@ -608,8 +739,8 @@ class DealerViewSet(viewsets.ViewSet):
         last_month_orders = Order.objects.filter(
             items__product__dealer=dealer_profile,
             created_at__gte=last_month_start,
-            created_at__lte=last_month_end,
-            status__in=['completed', 'shipped']
+            created_at__lt=last_month_end_exclusive,
+            status__in=COMPLETED_ORDER_STATUSES
         ).distinct()
         
         last_month_revenue = sum(
@@ -623,7 +754,7 @@ class DealerViewSet(viewsets.ViewSet):
         # Calculate total lifetime earnings
         all_completed_orders = Order.objects.filter(
             items__product__dealer=dealer_profile,
-            status__in=['completed', 'shipped']
+            status__in=COMPLETED_ORDER_STATUSES
         ).distinct()
         
         total_revenue = sum(
@@ -636,15 +767,24 @@ class DealerViewSet(viewsets.ViewSet):
         
         # Get monthly breakdown for last 6 months
         monthly_breakdown = []
+
+        def _month_start_for_offset(base_month_start, offset):
+            year = base_month_start.year
+            month = base_month_start.month - offset
+            while month <= 0:
+                month += 12
+                year -= 1
+            return base_month_start.replace(year=year, month=month, day=1)
+
         for i in range(5, -1, -1):
-            month_start = (current_month_start - timedelta(days=i*30)).replace(day=1)
-            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            month_start = _month_start_for_offset(current_month_start, i)
+            month_end_exclusive = (month_start + timedelta(days=32)).replace(day=1)
             
             month_orders = Order.objects.filter(
                 items__product__dealer=dealer_profile,
                 created_at__gte=month_start,
-                created_at__lte=month_end,
-                status__in=['completed', 'shipped']
+                created_at__lt=month_end_exclusive,
+                status__in=COMPLETED_ORDER_STATUSES
             ).distinct()
             
             month_rev = sum(
@@ -661,19 +801,140 @@ class DealerViewSet(viewsets.ViewSet):
                 'revenue_ksh': float(month_rev),
                 'commission_ksh': float(month_comm)
             })
-        
-        # Calculate pending payout (earnings not yet paid)
-        pending_payout = total_earnings - dealer_profile.total_earnings
+
+        pending_payout = self._calculate_pending_payout(dealer_profile)
         
         return Response({
             'commission_rate': float(dealer_profile.commission_rate),
             'this_month_ksh': float(current_month_earnings),
             'last_month_ksh': float(last_month_earnings),
             'total_lifetime_ksh': float(total_earnings),
-            'pending_payout_ksh': max(0, float(pending_payout)),
+            'pending_payout_ksh': float(pending_payout),
             'monthly_breakdown': monthly_breakdown,
             'total_orders': all_completed_orders.count(),
             'current_month_orders': current_month_orders.count()
+        })
+
+    @action(detail=False, methods=['get'])
+    def payouts(self, request):
+        """Get dealer payout history"""
+        from .models import Payout
+        dealer_profile = self._get_dealer_profile(request)
+        payouts = Payout.objects.filter(dealer=dealer_profile).order_by('-created_at')
+        
+        data = []
+        for payout in payouts:
+            data.append({
+                'id': payout.id,
+                'amount': float(payout.amount),
+                'status': payout.status,
+                'mpesa_receipt_number': payout.mpesa_receipt_number,
+                'period_start': payout.period_start.strftime('%b %d, %Y'),
+                'period_end': payout.period_end.strftime('%b %d, %Y'),
+                'created_at': payout.created_at.strftime('%b %d, %Y'),
+                'completed_at': payout.completed_at.strftime('%b %d, %Y') if payout.completed_at else None,
+                'failure_reason': payout.failure_reason,
+            })
+        
+        return Response({'payouts': data})
+    
+    @action(detail=False, methods=['post'])
+    def request_payout(self, request):
+        """Request a payout for pending earnings"""
+        from .models import Payout
+        from django.db import transaction
+        
+        dealer_profile = self._get_dealer_profile(request)
+        pending_available = self._calculate_pending_payout(dealer_profile)
+        minimum_payout = Decimal('100.00')
+
+        requested_amount_raw = request.data.get('amount')
+        if requested_amount_raw in [None, '']:
+            payout_amount = pending_available
+        else:
+            try:
+                payout_amount = Decimal(str(requested_amount_raw).replace(',', '').strip())
+            except Exception:
+                return Response({
+                    'success': False,
+                    'error': 'Invalid payout amount.'
+                }, status=400)
+        
+        # Check if there's a pending payout amount
+        if pending_available <= 0:
+            return Response({
+                'success': False,
+                'error': 'No pending payout available from delivered sales yet.'
+            }, status=400)
+
+        if payout_amount <= 0:
+            return Response({
+                'success': False,
+                'error': 'Payout amount must be greater than zero.'
+            }, status=400)
+
+        if payout_amount > pending_available:
+            return Response({
+                'success': False,
+                'error': f'Requested amount exceeds available payout. Available: KSh {pending_available:,.2f}.'
+            }, status=400)
+
+        if payout_amount < minimum_payout:
+            return Response({
+                'success': False,
+                'error': f'Minimum payout is KSh 100. Requested: KSh {payout_amount:,.2f}.'
+            }, status=400)
+        
+        # Check for existing pending/processing payouts
+        existing_payout = Payout.objects.filter(
+            dealer=dealer_profile,
+            status__in=['pending', 'processing']
+        ).first()
+        
+        if existing_payout:
+            return Response({
+                'success': False,
+                'error': f'Payout already in progress (Status: {existing_payout.status})'
+            }, status=400)
+        
+        # Calculate period (last 30 days)
+        period_end = timezone.now().date()
+        period_start = period_end - timedelta(days=30)
+        
+        with transaction.atomic():
+            # Create payout record
+            payout = Payout.objects.create(
+                dealer=dealer_profile,
+                amount=payout_amount,
+                status='pending',
+                period_start=period_start,
+                period_end=period_end
+            )
+            
+            # In a real implementation, this would trigger M-Pesa B2C
+            # For now, simulate successful payout
+            payout.status = 'completed'
+            payout.mpesa_receipt_number = f'SFT{timezone.now().strftime("%y%m%d")}{payout.id:04d}'
+            payout.completed_at = timezone.now()
+            payout.save()
+            
+            # Update dealer totals
+            dealer_profile.total_earnings += payout.amount
+            remaining_pending = max(Decimal('0.00'), pending_available - payout.amount)
+            dealer_profile.pending_payout = remaining_pending
+            dealer_profile.save(update_fields=['total_earnings', 'pending_payout'])
+        
+        return Response({
+            'success': True,
+            'message': f'Payout of KSh {payout.amount:,.2f} completed successfully',
+            'payout': {
+                'id': payout.id,
+                'amount': float(payout.amount),
+                'status': payout.status,
+                'mpesa_receipt_number': payout.mpesa_receipt_number,
+                'completed_at': payout.completed_at.strftime('%b %d, %Y %H:%M')
+            },
+            'remaining_pending_ksh': float(remaining_pending)
         })
 
     @action(detail=False, methods=['get'])
@@ -776,30 +1037,29 @@ class DealerViewSet(viewsets.ViewSet):
         inventories = DealerInventory.objects.filter(dealer=dealer_profile).select_related('product', 'product__category')
 
         # Total valuation
-        total_value = sum(
-            inv.stock_quantity * (inv.product.selling_price or 0)
-            for inv in inventories
-        )
+        total_value = Decimal('0.00')
 
         # Category breakdown
         from collections import defaultdict
-        category_data = defaultdict(lambda: {'total_value': 0, 'item_count': 0})
+        category_data = defaultdict(lambda: {'total_value': Decimal('0.00'), 'item_count': 0})
 
         for inv in inventories:
             cat_name = inv.product.category.name if inv.product.category else 'Uncategorized'
-            value = float(inv.stock_quantity * (inv.product.cost_price or 0))
+            unit_value = inv.product.cost_price or inv.product.selling_price or Decimal('0.00')
+            value = unit_value * inv.stock_quantity
+            total_value += value
             category_data[cat_name]['total_value'] += value
             category_data[cat_name]['item_count'] += 1
 
         # Convert to list with percentages
         category_breakdown = []
         for cat_name, data in category_data.items():
-            percentage = (data['total_value'] / total_value * 100) if total_value > 0 else 0
+            percentage = ((data['total_value'] / total_value) * Decimal('100.00')) if total_value > 0 else Decimal('0.00')
             category_breakdown.append({
                 'category': cat_name,
-                'total_value_kes': data['total_value'],
+                'total_value_kes': float(data['total_value']),
                 'item_count': data['item_count'],
-                'percentage': round(percentage, 2)
+                'percentage': float(round(percentage, 2))
             })
 
         category_breakdown.sort(key=lambda x: x['total_value_kes'], reverse=True)
@@ -844,7 +1104,7 @@ class DealerViewSet(viewsets.ViewSet):
                 sales = OrderItem.objects.filter(
                     product=product,
                     order__created_at__date=current_date,
-                    order__status__in=['completed', 'shipped']
+                    order__status__in=COMPLETED_ORDER_STATUSES
                 ).aggregate(total=Sum('quantity'))['total'] or 0
 
                 daily_sales.append({'date': current_date.isoformat(), 'sales': int(sales)})
@@ -917,7 +1177,7 @@ class DealerViewSet(viewsets.ViewSet):
         product_sales = OrderItem.objects.filter(
             product__in=dealer_products,
             order__created_at__range=[start_date, end_date],
-            order__status__in=['completed', 'shipped']
+            order__status__in=COMPLETED_ORDER_STATUSES
         ).values('product__id', 'product__name').annotate(
             total_value=Sum(F('quantity') * F('unit_price')),
             total_quantity=Sum('quantity')
@@ -998,7 +1258,7 @@ class DealerViewSet(viewsets.ViewSet):
             quarterly_demand = OrderItem.objects.filter(
                 product=product,
                 order__created_at__range=[start_date, end_date],
-                order__status__in=['completed', 'shipped']
+                order__status__in=COMPLETED_ORDER_STATUSES
             ).aggregate(total=Sum('quantity'))['total'] or 0
 
             annual_demand = quarterly_demand * 4
@@ -1151,7 +1411,7 @@ class DealerViewSet(viewsets.ViewSet):
                 product__in=dealer_products,
                 order__created_at__gte=month_start,
                 order__created_at__lt=month_end,
-                order__status__in=['completed', 'shipped']
+                order__status__in=COMPLETED_ORDER_STATUSES
             ).select_related('product')
 
             month_income = sum(float(item.quantity * item.unit_price) for item in month_items)
@@ -1169,7 +1429,7 @@ class DealerViewSet(viewsets.ViewSet):
         top_products = OrderItem.objects.filter(
             product__in=dealer_products,
             order__created_at__gte=thirty_days_ago,
-            order__status__in=['completed', 'shipped']
+            order__status__in=COMPLETED_ORDER_STATUSES
         ).values('product__id', 'product__name').annotate(
             total_sold=Sum('quantity')
         ).order_by('-total_sold')[:5]
@@ -1185,4 +1445,130 @@ class DealerViewSet(viewsets.ViewSet):
             'stock_movement': stock_movement,
             'income_vs_expenditure': income_vs_expenditure,
             'top_products_chart': top_products_chart
+        })
+
+    @action(detail=False, methods=['post'], url_path='what-if')
+    def what_if_analysis(self, request):
+        """
+        POST /api/dealer/what-if/ - What-If Analysis (DSS for dealers)
+        
+        Inputs:
+        - product_id: Product to analyze
+        - demand_multiplier: Factor to multiply current demand (default 1.0)
+        - lead_time_multiplier: Factor to adjust lead time (default 1.0)
+        - holding_cost_percent: Annual holding cost as % of product cost (default 20)
+        - ordering_cost: Cost per order (default 500)
+        - service_level: Desired service level 0-1 (default 0.95 for 95%)
+        
+        Computes:
+        - EOQ (Economic Order Quantity)
+        - Reorder Point
+        - Safety Stock
+        - Total Cost
+        """
+        import math
+        
+        dealer_profile = self._get_dealer_profile(request)
+        dealer_products = self._get_dealer_products(request)
+        
+        # Get inputs
+        product_id = request.data.get('product_id')
+        demand_multiplier = float(request.data.get('demand_multiplier', 1.0))
+        lead_time_multiplier = float(request.data.get('lead_time_multiplier', 1.0))
+        holding_cost_percent = float(request.data.get('holding_cost_percent', 20.0))
+        ordering_cost = float(request.data.get('ordering_cost', 500.0))
+        service_level = float(request.data.get('service_level', 0.95))
+        
+        # Get product
+        try:
+            product = dealer_products.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+        
+        # Get inventory record
+        try:
+            inventory = DealerInventory.objects.get(dealer=dealer_profile, product=product)
+        except DealerInventory.DoesNotExist:
+            return Response({'error': 'Product not in dealer inventory'}, status=404)
+        
+        # Calculate historical demand (last 90 days)
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=90)
+        quarterly_demand = OrderItem.objects.filter(
+            product=product,
+            order__created_at__range=[start_date, end_date],
+            order__status__in=COMPLETED_ORDER_STATUSES
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        
+        # Annual demand with multiplier
+        annual_demand = (quarterly_demand * 4) * demand_multiplier
+        
+        # Holding cost per unit per year
+        holding_cost_per_unit = (product.cost_price or 0) * (holding_cost_percent / 100.0)
+        
+        # Calculate EOQ using formula: EOQ = sqrt(2DS/H)
+        if holding_cost_per_unit > 0:
+            eoq = math.sqrt((2 * annual_demand * ordering_cost) / holding_cost_per_unit)
+        else:
+            eoq = 0
+        
+        # Lead time in days (default 7, multiplied by factor)
+        lead_time_days = max(1, int(7 * lead_time_multiplier))
+        
+        # Average daily demand
+        daily_demand = annual_demand / 365.0
+        
+        # Reorder point = (daily_demand * lead_time_days) + safety_stock
+        # For 95% service level, safety factor ≈ 1.65 (from normal distribution)
+        # Standard deviation ≈ sqrt(lead_time_days) * daily_demand
+        service_factor_map = {
+            0.90: 1.28,
+            0.95: 1.65,
+            0.99: 2.33,
+        }
+        service_factor = service_factor_map.get(round(service_level * 20) / 20, 1.65)
+        
+        std_dev = math.sqrt(lead_time_days) * daily_demand
+        safety_stock = service_factor * std_dev
+        reorder_point = (daily_demand * lead_time_days) + safety_stock
+        
+        # Total annual cost
+        holding_cost_annual = (eoq / 2) * holding_cost_per_unit  # Average inventory * cost
+        ordering_cost_annual = (annual_demand / eoq) * ordering_cost if eoq > 0 else 0
+        total_cost = holding_cost_annual + ordering_cost_annual
+        
+        return Response({
+            'product_id': product.id,
+            'product_name': product.name,
+            'scenario': {
+                'demand_multiplier': demand_multiplier,
+                'lead_time_multiplier': lead_time_multiplier,
+                'holding_cost_percent': holding_cost_percent,
+                'ordering_cost': ordering_cost,
+                'service_level': service_level,
+            },
+            'metrics': {
+                'historical_quarterly_demand': quarterly_demand,
+                'annual_demand': round(annual_demand, 2),
+                'daily_demand': round(daily_demand, 2),
+                'eoq': round(eoq, 2),
+                'reorder_point': round(reorder_point, 2),
+                'safety_stock': round(safety_stock, 2),
+                'lead_time_days': lead_time_days,
+                'service_factor': service_factor,
+                'holding_cost_per_unit_annual': round(holding_cost_per_unit, 2),
+            },
+            'costs': {
+                'annual_holding_cost': round(holding_cost_annual, 2),
+                'annual_ordering_cost': round(ordering_cost_annual, 2),
+                'total_annual_cost': round(total_cost, 2),
+                'cost_per_unit': round(total_cost / annual_demand, 4) if annual_demand > 0 else 0,
+            },
+            'recommendations': {
+                'order_quantity': round(eoq, 0),
+                'reorder_when_stock_reaches': round(reorder_point, 0),
+                'minimum_safety_stock': round(safety_stock, 0),
+                'current_stock': inventory.stock_quantity,
+                'is_below_reorder_point': inventory.stock_quantity < reorder_point,
+            }
         })

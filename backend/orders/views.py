@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -15,6 +15,7 @@ from .models import Order, OrderItem, OrderStatusHistory
 from .serializers import OrderSerializer, OrderCreateSerializer, OrderStatusHistorySerializer
 from .receipt_service import get_receipt_response
 from .services import OrderStatusManager, InventoryManager, get_order_summary
+from .utils import calculate_shipping_cost
 
 class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
     queryset = Order.objects.prefetch_related('items', 'status_history')
@@ -28,6 +29,38 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
         if self.action == 'create':
             return OrderCreateSerializer
         return OrderSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """Override create to wrap response properly"""
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return self.error_response(
+                message='Order validation failed',
+                code='VALIDATION_ERROR',
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            self.perform_create(serializer)
+        except serializers.ValidationError as exc:
+            detail = exc.detail if hasattr(exc, 'detail') else {'detail': [str(exc)]}
+            errors = detail if isinstance(detail, dict) else {'detail': detail}
+            return self.error_response(
+                message='Order validation failed',
+                code='VALIDATION_ERROR',
+                errors=errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = serializer.instance
+        response_serializer = OrderSerializer(order, context=self.get_serializer_context())
+
+        return self.success_response(
+            data=response_serializer.data,
+            message='Order created successfully',
+            status_code=status.HTTP_201_CREATED
+        )
     
     def get_queryset(self):
         if self.request.user.role == 'admin':
@@ -78,10 +111,14 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
                         status_code=400
                     )
 
+            shipping_address = ''
+            if hasattr(user, 'profile') and getattr(user.profile, 'address', None):
+                shipping_address = user.profile.address
+
             # Calculate totals
             subtotal = Decimal(cart.get_total())
-            tax_amount = subtotal * Decimal('0.08')
-            shipping_cost = Decimal('10.00')
+            tax_amount = Decimal('0.00')
+            shipping_cost = calculate_shipping_cost(address=shipping_address, city='')
             total_amount = subtotal + tax_amount + shipping_cost
 
             # Generate order number
@@ -107,10 +144,6 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
                     code='STOCK_RESERVATION_FAILED',
                     status_code=500
                 )
-
-            shipping_address = ''
-            if hasattr(user, 'profile') and getattr(user.profile, 'address', None):
-                shipping_address = user.profile.address
 
             # Create order
             order = Order.objects.create(
@@ -157,6 +190,35 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        """Allow customers to remove old completed/cancelled orders from history."""
+        order = self.get_object()
+
+        if request.user.role != 'admin' and order.created_by_id != request.user.id:
+            return self.error_response(
+                message='You do not have permission to delete this order',
+                code='PERMISSION_DENIED',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Keep active lifecycle orders from being deleted mid-fulfillment.
+        if request.user.role != 'admin' and order.status not in ['delivered', 'cancelled', 'refunded']:
+            return self.error_response(
+                message='Only delivered or cancelled orders can be deleted from history.',
+                code='INVALID_ORDER_STATE',
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order_id = order.id
+        order_number = order.order_number
+        self.perform_destroy(order)
+
+        return self.success_response(
+            data={'order_id': order_id, 'order_number': order_number},
+            message='Order deleted successfully',
+            status_code=status.HTTP_200_OK,
+        )
     
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None):
@@ -245,6 +307,34 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
         """Download PDF receipt for an order"""
         order = self.get_object()
         return get_receipt_response(order)
+
+    @action(detail=True, methods=['post'])
+    def reorder(self, request, pk=None):
+        from cart.models import Cart, CartItem
+
+        past_order = self.get_object()
+        if past_order.status != 'delivered':
+            return self.error_response(
+                message='Only delivered orders can be reordered',
+                code='INVALID_ORDER_STATE',
+                status_code=400,
+            )
+
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        for item in past_order.items.select_related('product').all():
+            cart_item, created = CartItem.objects.get_or_create(
+                cart=cart,
+                product=item.product,
+                defaults={'quantity': item.quantity},
+            )
+            if not created:
+                cart_item.quantity += item.quantity
+                cart_item.save(update_fields=['quantity'])
+
+        return self.success_response(
+            data={'order_id': past_order.id, 'cart_items': cart.get_total_items()},
+            message='Items added to cart successfully',
+        )
     
     @action(detail=False, methods=['get'])
     def statistics(self, request):
@@ -259,3 +349,32 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
             'total_revenue': orders.filter(status='delivered').aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
         }
         return self.success_response(data=stats, message='Order statistics fetched')
+
+    @action(detail=True, methods=['get'])
+    def timeline(self, request, pk=None):
+        """Get order status timeline with full history"""
+        from datetime import timedelta
+        
+        order = self.get_object()
+        status_history = order.status_history.all().order_by('changed_at')
+        
+        # Calculate estimated delivery date (add 3 days if shipped)
+        estimated_delivery = None
+        if order.status == 'shipped' and status_history.exists():
+            shipped_entry = status_history.filter(new_status='shipped').last()
+            if shipped_entry:
+                estimated_delivery = (shipped_entry.changed_at + timedelta(days=3)).date()
+        
+        serializer = OrderStatusHistorySerializer(status_history, many=True)
+        
+        return self.success_response(
+            data={
+                'order_id': order.id,
+                'order_number': order.order_number,
+                'current_status': order.status,
+                'timeline': serializer.data,
+                'estimated_delivery': estimated_delivery,
+                'created_at': order.created_at
+            },
+            message='Order timeline fetched'
+        )

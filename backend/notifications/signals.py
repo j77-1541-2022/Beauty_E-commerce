@@ -5,8 +5,21 @@ from django.db.models import Sum
 from orders.models import Order, OrderItem
 from users.models import User
 from dealer.models import DealerInventory, DealerStockMovement
-from .email_service import send_order_confirmation, send_status_update, send_welcome_email
 from .models import NotificationPreference, DealerNotification
+# Optional Celery tasks - fall back to sync execution if Celery not available
+try:
+    from .tasks import (
+        async_send_order_confirmation,
+        async_send_status_update,
+        async_send_welcome_email,
+    )
+    # Check if tasks actually have .delay() method (Celery available)
+    CELERY_AVAILABLE = hasattr(async_send_order_confirmation, 'delay')
+except ImportError:
+    CELERY_AVAILABLE = False
+    async_send_order_confirmation = None
+    async_send_status_update = None
+    async_send_welcome_email = None
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +28,12 @@ logger = logging.getLogger(__name__)
 def order_post_save(sender, instance, created, **kwargs):
     """Send emails on order creation and status change, and create dealer notifications"""
     if created:
-        logger.info(f"New order created: {instance.id}, sending confirmation email")
-        send_order_confirmation(instance.id)
+        logger.info(f"New order created: {instance.id}")
+        # Trigger async email task (will fall back to sync if Redis unavailable)
+        if CELERY_AVAILABLE and async_send_order_confirmation:
+            async_send_order_confirmation.delay(instance.id)
+        else:
+            logger.info(f"Celery not available - email would be sent for order {instance.id}")
         
         # Create dealer notifications for new orders containing dealer products
         try:
@@ -49,7 +66,11 @@ def order_post_save(sender, instance, created, **kwargs):
             old_order = Order.objects.get(id=instance.id)
             if old_order.status != instance.status:
                 logger.info(f"Order {instance.id} status changed to {instance.status}")
-                send_status_update(instance.id, instance.status)
+                # Trigger async email task
+                if CELERY_AVAILABLE and async_send_status_update:
+                    async_send_status_update.delay(instance.id, instance.status)
+                else:
+                    logger.info(f"Celery not available - status email would be sent for order {instance.id}")
                 
                 # Create payment confirmation notification for dealers
                 if instance.status == 'paid' or instance.payment_status == 'completed':
@@ -84,8 +105,12 @@ def user_post_save(sender, instance, created, **kwargs):
         logger.info(f"Notification preferences created for user {instance.id}")
         
         if instance.role == 'customer':
-            logger.info(f"New customer registered: {instance.id}, sending welcome email")
-            send_welcome_email(instance.id)
+            logger.info(f"New customer registered: {instance.id}")
+            # Trigger async email task
+            if CELERY_AVAILABLE and async_send_welcome_email:
+                async_send_welcome_email.delay(instance.id)
+            else:
+                logger.info(f"Celery not available - welcome email would be sent for user {instance.id}")
 
 
 @receiver(post_save, sender=DealerStockMovement)

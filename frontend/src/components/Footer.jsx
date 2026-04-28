@@ -287,14 +287,14 @@ const Footer = () => {
               </p>
             </div>
             <div className="flex items-center space-x-6">
-              <Link to="/shop" className={`${isDark ? 'text-gray-400 hover:text-pink-400' : 'text-gray-500 hover:text-pink-600'} transition-colors text-sm`}>
+              <Link to="/info" className={`${isDark ? 'text-gray-400 hover:text-pink-400' : 'text-gray-500 hover:text-pink-600'} transition-colors text-sm`}>
                 Privacy Policy
               </Link>
-              <Link to="/shop" className={`${isDark ? 'text-gray-400 hover:text-pink-400' : 'text-gray-500 hover:text-pink-600'} transition-colors text-sm`}>
+              <Link to="/info" className={`${isDark ? 'text-gray-400 hover:text-pink-400' : 'text-gray-500 hover:text-pink-600'} transition-colors text-sm`}>
                 Terms of Service
               </Link>
               <Link to="/shop" className={`${isDark ? 'text-gray-400 hover:text-pink-400' : 'text-gray-500 hover:text-pink-600'} transition-colors text-sm`}>
-                Cookie Policy
+                Shop All Products
               </Link>
             </div>
             <div className="flex items-center space-x-2">

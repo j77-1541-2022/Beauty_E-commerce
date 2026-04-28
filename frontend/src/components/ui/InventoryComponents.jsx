@@ -124,12 +124,10 @@ export const ExportButton = ({ reportType, label }) => {
 				return res.data?.abc_data || [];
 			}
 			case 'eoq-calculator': {
-				const productsRes = await dealerAPI.getProducts();
-				const products = Array.isArray(productsRes.data)
-					? productsRes.data
-					: productsRes.data?.results || [];
-				if (!products.length) return [];
-				const eoqRes = await dealerAPI.getEOQ(products[0].id);
+				const eoqRes = await dealerAPI.getEOQ();
+				if (Array.isArray(eoqRes.data?.eoq_data)) {
+					return eoqRes.data.eoq_data;
+				}
 				return eoqRes.data ? [eoqRes.data] : [];
 			}
 			case 'reorder-recommendations': {

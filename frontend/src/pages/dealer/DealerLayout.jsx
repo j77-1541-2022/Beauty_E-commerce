@@ -7,6 +7,7 @@ import {
 import { GlassCard } from '../../components/ui/InventoryComponents'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { ThemeSwitcher } from '../../components/theme/ThemeSwitcher'
 
 const DealerLayout = () => {
   const { user, logout } = useAuth()
@@ -39,11 +40,11 @@ const DealerLayout = () => {
     { path: '/dealer/products', label: 'My Products', icon: Package },
     { path: '/dealer/inventory', label: 'Inventory', icon: AlertTriangle },
     {
-      label: 'Inventory Reports',
-      path: '/dealer/inventory-reports',
+      label: 'Reports',
+      path: '/dealer/reports',
       icon: BarChart2,
       badge: lowStockCount,
-      description: '4 inventory reports',
+      description: 'Dealer reports access',
     },
     {
       label: 'DSS Insights',
@@ -115,9 +116,12 @@ const DealerLayout = () => {
           </nav>
 
           <div className={`pt-4 border-t ${colors.cardBorder}`}>
-            <div className="mb-4">
-              <p className={`text-sm font-medium ${colors.text}`}>{user?.username}</p>
-              <p className={`text-xs ${colors.textMuted}`}>Dealer Account</p>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className={`text-sm font-medium ${colors.text}`}>{user?.username}</p>
+                <p className={`text-xs ${colors.textMuted}`}>Dealer Account</p>
+              </div>
+              <ThemeSwitcher />
             </div>
             <button
               onClick={handleLogout}
@@ -135,9 +139,12 @@ const DealerLayout = () => {
           <h1 className={`text-lg font-bold ${colors.primary} bg-clip-text text-transparent`}>
             Dealer Portal
           </h1>
-          <button onClick={() => setSidebarOpen(true)} className={`p-2 ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg`}>
-            <Menu className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            <button onClick={() => setSidebarOpen(true)} className={`p-2 ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} rounded-lg`}>
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 p-6 overflow-auto">

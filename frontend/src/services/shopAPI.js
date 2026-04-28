@@ -1,4 +1,4 @@
-import api from './api'
+import apiClient from './apiClient'
 import { resolveProductImage } from '../utils/productImage'
 
 // WebSocket service removed - using REST API only
@@ -15,7 +15,7 @@ const shopAPI = {
     try {
       console.log('🛍️ Fetching products with inventory status:', params)
       
-      const response = await api.get('/products/admin/products/', {
+      const response = await apiClient.get('/products/admin/products/', {
         params: {
           ...params,
           customer_view: true,
@@ -65,7 +65,7 @@ const shopAPI = {
     try {
       console.log('📂 Fetching categories')
       
-      const response = await api.get('/products/categories/')
+      const response = await apiClient.get('/products/categories/')
       
       // Handle different response formats
       let categories = Array.isArray(response) ? response : (response.results || [])
@@ -136,12 +136,9 @@ const shopAPI = {
         return shopAPI.getProducts(params)
       }
 
-      const response = await api.get('/products/admin/products/', {
+      const response = await apiClient.get('/products/', {
         params: {
           search: query.trim(),
-          customer_view: true,
-          include_inventory: true,
-          include_stock_status: true,
           ...params
         }
       })
@@ -206,7 +203,7 @@ const shopAPI = {
     try {
       console.log('📂 Fetching products by category:', category)
       
-      const response = await api.get('/products/admin/products/', {
+      const response = await apiClient.get('/products/admin/products/', {
         params: {
           category__name__iexact: category,
           customer_view: true,
@@ -275,7 +272,7 @@ const shopAPI = {
     try {
       console.log('🔍 Fetching product:', id)
       
-      const response = await api.get(`/products/admin/products/${id}/`, {
+      const response = await apiClient.get(`/products/admin/products/${id}/`, {
         params: {
           customer_view: true,
           include_inventory: true,

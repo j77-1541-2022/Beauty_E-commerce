@@ -1,22 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, TrendingUp, BarChart2, Package, RefreshCw } from 'lucide-react';
+import { Brain, BarChart2, Package, RefreshCw } from 'lucide-react';
 import { GlassCard, TabButton, ExportButton } from '../../components/ui/InventoryComponents';
 import { ProjectHighlights } from '../../components/ui/ProjectHighlights';
 import { dealerAPI } from '../../services/apiClient';
 
 const DSS = [
-	{
-		key: 'demand-forecast',
-		label: 'Demand Forecast',
-		icon: TrendingUp,
-		columns: [
-			{ label: 'Product', key: 'product_name' },
-			{ label: 'Date', key: 'date' },
-			{ label: 'Forecast', key: 'forecast' },
-			{ label: 'Lower', key: 'lower' },
-			{ label: 'Upper', key: 'upper' },
-		],
-	},
 	{
 		key: 'abc-analysis',
 		label: 'ABC Analysis',
@@ -78,16 +66,9 @@ const DSSInsights = () => {
 				rows = res.data?.recommendations || [];
 			}
 
-			if (reportKey === 'demand-forecast' || reportKey === 'eoq-calculator') {
-				if (reportKey === 'demand-forecast') {
-					const res = await dealerAPI.getDemandForecast();
-					rows = res.data?.future_forecast || res.data?.rows || [];
-				}
-
-				if (reportKey === 'eoq-calculator') {
-					const res = await dealerAPI.getEOQ();
-					rows = res.data?.eoq_data || (res.data ? [res.data] : []);
-				}
+			if (reportKey === 'eoq-calculator') {
+				const res = await dealerAPI.getEOQ();
+				rows = res.data?.eoq_data || (res.data ? [res.data] : []);
 			}
 
 			setData(rows);

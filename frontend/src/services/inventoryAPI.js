@@ -1,4 +1,4 @@
-import api from './api'
+import apiClient from './apiClient'
 
 // Live Inventory API Service
 // Single source of truth for all product inventory data
@@ -9,7 +9,7 @@ const inventoryAPI = {
     try {
       console.log('🔍 Fetching all products:', params)
       // Fetch from main products endpoint - includes both admin and dealer products
-      const response = await api.get('/products/', {
+      const response = await apiClient.get('/products/', {
         params: {
           ...params,
           is_active: true
@@ -28,7 +28,7 @@ const inventoryAPI = {
     try {
       console.log('🛍️ Fetching available products:', params)
       // Fetch from main products endpoint - includes both admin and dealer products
-      const response = await api.get('/products/', {
+      const response = await apiClient.get('/products/', {
         params: {
           ...params,
           is_active: true
@@ -46,7 +46,7 @@ const inventoryAPI = {
   getProductsWithInventoryStatus: async (params = {}) => {
     try {
       console.log('📊 Fetching products with inventory status from admin:', params)
-      const response = await api.get('/products/admin/products/', {
+      const response = await apiClient.get('/products/admin/products/', {
         params: {
           ...params,
           include_inventory_status: true,
@@ -71,7 +71,7 @@ const inventoryAPI = {
     try {
       console.log('📈 Fetching inventory statistics')
       // Use the main products endpoint - includes both admin and dealer
-      const response = await api.get('/products/', {
+      const response = await apiClient.get('/products/', {
         params: { is_active: true }
       })
 
@@ -104,7 +104,7 @@ const inventoryAPI = {
   searchProducts: async (query, params = {}) => {
     try {
       console.log('🔍 Searching products:', query)
-      const response = await api.get('/products/', {
+      const response = await apiClient.get('/products/', {
         params: {
           ...params,
           search: query,
@@ -123,7 +123,7 @@ const inventoryAPI = {
   getProduct: async (id) => {
     try {
       console.log('🔍 Fetching product:', id)
-      const response = await api.get(`/products/${id}/`)
+      const response = await apiClient.get(`/products/${id}/`)
       console.log('✅ Product response:', response.data)
       return response.data
     } catch (error) {

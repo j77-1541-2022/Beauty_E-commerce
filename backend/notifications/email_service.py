@@ -218,3 +218,45 @@ def send_welcome_email(user_id):
     except Exception as e:
         logger.error(f"Failed to send welcome email: {str(e)}")
         return {'success': False, 'error': str(e)}
+
+def send_payment_confirmation(payment_id):
+    """Send payment confirmation email to customer"""
+    try:
+        from payments.models import Payment
+        
+        payment = Payment.objects.select_related('order', 'order__created_by').get(id=payment_id)
+        order = payment.order
+        customer_user = order.created_by
+        
+        # Check customer preference
+        if customer_user and hasattr(customer_user, 'notification_preference') and not customer_user.notification_preference.order_updates:
+            logger.info(f"Payment confirmation email skipped - user preference disabled for payment {payment_id}")
+            return {'success': False, 'reason': 'user_preference_disabled'}
+        
+        context = {
+            'order_number': order.order_number or str(order.id)[:8].upper(),
+            'payment_method': payment.payment_method,
+            'amount': f"{payment.amount:,.2f}",
+            'transaction_id': getattr(payment, 'transaction_id', 'N/A'),
+            'payment_date': payment.created_at.strftime('%B %d, %Y at %H:%M'),
+            'order_id': str(order.id),
+            'frontend_url': settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else 'http://localhost:3000'
+        }
+        
+        html_message = render_to_string('emails/payment_confirmation.html', context)
+        
+        send_mail(
+            subject=f'Payment Confirmed - Order #{context["order_number"]}',
+            message='',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[order.customer_email],
+            html_message=html_message,
+            fail_silently=True
+        )
+        
+        logger.info(f"Payment confirmation email sent to {order.customer_email} for payment {payment_id}")
+        return {'success': True}
+        
+    except Exception as e:
+        logger.error(f"Failed to send payment confirmation email: {str(e)}")
+        return {'success': False, 'error': str(e)}

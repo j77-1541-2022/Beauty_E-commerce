@@ -25,7 +25,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+  timeout: 60000, // Increased to 60 seconds for slow operations like order creation
 });
 
 // Request interceptor - add auth token
@@ -133,6 +133,7 @@ export const productAPI = {
 export const productsAPI = productAPI;
 
 export const orderAPI = {
+  list: (params) => apiClient.get('/orders/', { params }),
   getAll: (params) => apiClient.get('/orders/', { params }),
   getById: (id) => apiClient.get(`/orders/${id}/`),
   create: (data) => apiClient.post('/orders/', data),
@@ -141,7 +142,10 @@ export const orderAPI = {
   confirmOrder: (id) => apiClient.post(`/orders/${id}/confirm_order/`),
   createFromCart: () => apiClient.post('/orders/create_from_cart/'),
   getReceipt: (id) => apiClient.get(`/orders/${id}/receipt/`),
+  getTimeline: (id) => apiClient.get(`/orders/${id}/timeline/`),
   getStatistics: () => apiClient.get('/orders/statistics/'),
+  reorder: (id) => apiClient.post(`/orders/${id}/reorder/`),
+  createOrder: (data) => apiClient.post('/orders/', data),
 };
 
 export const inventoryAPI = {
@@ -174,6 +178,7 @@ export const dealerAPI = {
   getDashboard: () => apiClient.get('/dealer/dashboard/'),
   getOrders: (params) => apiClient.get('/dealer/orders/', { params }),
   updateOrderStatus: (orderId, status) => apiClient.patch(`/dealer/${orderId}/order_status/`, { status }),
+  bulkUpdateOrderStatus: (orderIds, status) => apiClient.patch('/dealer/bulk_update_status/', { order_ids: orderIds, status }),
   getProducts: () => apiClient.get('/dealer/products/'),
   createProduct: (data) => apiClient.post('/dealer/products/', data),
   updateProduct: (id, data) => apiClient.patch(`/dealer/${id}/products/`, data),
@@ -192,17 +197,30 @@ export const dealerAPI = {
   getStockMovementReport: (params) => apiClient.get('/dealer/reports_stock_movement/', { params }),
   getValuationReport: () => apiClient.get('/dealer/reports_valuation/'),
   // Analytics/DSS endpoints
-  getDemandForecast: (productId) => apiClient.get('/dealer/analytics_forecast/', { params: productId ? { product_id: productId } : {} }),
   getABCAnalysis: () => apiClient.get('/dealer/analytics_abc/'),
   getEOQ: (productId, params = {}) => apiClient.get('/dealer/analytics_eoq/', { params: productId ? { product_id: productId, ...params } : params }),
   getReorderRecommendations: () => apiClient.get('/dealer/analytics_reorder_recommendations/'),
   // Dashboard charts data
   getDashboardCharts: () => apiClient.get('/dealer/dashboard_charts/'),
+  // Payout endpoints
+  getPayouts: () => apiClient.get('/dealer/payouts/'),
+  requestPayout: (payload = {}) => apiClient.post('/dealer/request_payout/', payload),
 };
 
 export const notificationAPI = {
+  // Customer notification preferences
   getPreferences: () => apiClient.get('/notifications/preferences/'),
   updatePreferences: (data) => apiClient.patch('/notifications/preferences/', data),
+
+  // Customer in-app notifications - now using /list/ prefix due to router changes
+  getCustomerNotifications: (params = {}) => apiClient.get('/notifications/list/', { params }),
+  getCustomerUnreadCount: () => apiClient.get('/notifications/list/unread-count/'),
+  markCustomerAsRead: (id) => apiClient.post(`/notifications/list/${id}/mark-as-read/`),
+  markAllCustomerAsRead: () => apiClient.post('/notifications/list/mark-all-as-read/'),
+  deleteCustomerNotification: (id) => apiClient.delete(`/notifications/list/${id}/`),
+  createCustomerNotification: (data) => apiClient.post('/notifications/list/', data),
+
+  // Dealer notifications
   getDealerNotifications: (params = {}) => apiClient.get('/notifications/dealer/', { params }),
   markAsRead: (id) => apiClient.post(`/notifications/dealer/${id}/read/`),
   markAllAsRead: () => apiClient.post('/notifications/dealer/read-all/'),

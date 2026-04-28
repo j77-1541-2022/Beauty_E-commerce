@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, Building2, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Building2, Sparkles, CheckCircle } from 'lucide-react';
 import { GlassCard } from '../../components/ui/GlassCard';
 import { GlassButton } from '../../components/ui/GlassButton';
 import { useAuth } from '../../contexts/AuthContext';
@@ -63,9 +63,13 @@ export const RegisterPage = () => {
         // Auto login after registration
         const loginResult = await login({ identifier: formData.email, password: formData.password });
         if (loginResult.success) {
+          const storedRedirect = localStorage.getItem('redirectAfterLogin')
+          const from = location.state?.from?.pathname || storedRedirect;
           const dashboard = activeTab === 'admin' ? '/admin' : 
                            activeTab === 'dealer' ? '/dealer' : '/dashboard';
-          navigate(dashboard);
+          const destination = from && from !== '/login' && from !== '/register' ? from : dashboard;
+          localStorage.removeItem('redirectAfterLogin');
+          navigate(destination);
         }
       } else {
         setError(response.data.error?.message || 'Registration failed');
@@ -86,7 +90,14 @@ export const RegisterPage = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-        >
+          className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={20} className="text-green-500" />
+          </div>
+          <Link to="/shop" className="text-sm text-gray-500 hover:text-gray-700">
+            Back to Home
+          </Link>
+        </motion.div>
           <GlassCard className="register-card" elevated>
             <div className="register-header">
               <Sparkles size={32} />
@@ -241,9 +252,8 @@ export const RegisterPage = () => {
               <Link to="/login" className="signin-link">Sign in</Link>
             </div>
           </GlassCard>
-        </motion.div>
+        </div>
       </div>
-    </div>
   );
 };
 

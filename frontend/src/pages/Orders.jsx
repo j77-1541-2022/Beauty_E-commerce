@@ -110,13 +110,13 @@ const Orders = () => {
       if (searchTerm) params.search = searchTerm
       if (statusFilter) params.status = statusFilter
 
-      const response = await ordersAPI.getOrders(params)
+      const response = await orderAPI.getAll(params)
       console.log('Orders API Response:', response)
 
       // Handle both response formats
-      const ordersData = response.results || response.data || []
-      setOrders(ordersData)
-      console.log('Orders set:', ordersData.length, 'items')
+      const ordersData = response?.data?.data || response?.data?.results || response?.data || []
+      setOrders(Array.isArray(ordersData) ? ordersData : [])
+      console.log('Orders set:', Array.isArray(ordersData) ? ordersData.length : 0, 'items')
     } catch (error) {
       console.error('Failed to fetch orders:', error)
     } finally {
@@ -126,7 +126,7 @@ const Orders = () => {
 
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
-      await ordersAPI.updateStatus(orderId, { status: newStatus })
+      await orderAPI.updateStatus(orderId, newStatus)
       fetchOrders()
     } catch (error) {
       console.error('Failed to update status:', error)
@@ -135,7 +135,7 @@ const Orders = () => {
 
   const handleConfirmOrder = async (orderId) => {
     try {
-      await ordersAPI.confirmOrder(orderId)
+      await orderAPI.confirmOrder(orderId)
       fetchOrders()
     } catch (error) {
       console.error('Failed to confirm order:', error)
@@ -145,7 +145,7 @@ const Orders = () => {
   const handleCreateOrder = async (e) => {
     e.preventDefault()
     try {
-      await ordersAPI.createOrder(formData)
+      await orderAPI.createOrder(formData)
       setShowCreateModal(false)
       setFormData({
         customer_name: '',

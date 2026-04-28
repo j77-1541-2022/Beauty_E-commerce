@@ -135,8 +135,15 @@ class User(AbstractUser):
     
     def update_last_active(self):
         """Update last active timestamp"""
-        self.last_active = timezone.now()
-        self.save(update_fields=['last_active'])
+        try:
+            self.last_active = timezone.now()
+            self.save(update_fields=['last_active'])
+        except Exception as e:
+            # Log error but don't fail the entire login operation
+            # This prevents disk I/O errors from breaking login
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to update last_active for user {self.id}: {e}")
     
     def calculate_profile_completion(self):
         """Calculate profile completion percentage (0-100)"""

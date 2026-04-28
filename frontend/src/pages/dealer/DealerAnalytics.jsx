@@ -7,8 +7,8 @@ import {
   Legend, Area, ReferenceLine, Cell
 } from 'recharts'
 import { 
-  TrendingUp, PieChart, Calculator, AlertCircle, Brain, 
-  Target, Package, ArrowRight, RefreshCw, Info, CheckCircle,
+  PieChart, Calculator, AlertCircle, Brain, 
+  Package, ArrowRight, RefreshCw, Info, CheckCircle,
   AlertTriangle, ChevronRight, Settings
 } from 'lucide-react'
 import { GlassCard } from '../../components/ui/GlassCard'
@@ -19,20 +19,12 @@ const COLORS = {
   A: '#10b981', // emerald
   B: '#f59e0b', // amber
   C: '#ef4444', // red
-  forecast: '#8b5cf6',
-  actual: '#06b6d4',
-  confidence: '#ec4899'
 }
 
 const DealerAnalytics = () => {
-  const [activeTab, setActiveTab] = useState('forecast')
+  const [activeTab, setActiveTab] = useState('abc')
   const [loading, setLoading] = useState(false)
   const [products, setProducts] = useState([])
-  
-  // Forecast state
-  const [selectedForecastProduct, setSelectedForecastProduct] = useState('')
-  const [forecastData, setForecastData] = useState(null)
-  
   // ABC Analysis state
   const [abcData, setAbcData] = useState(null)
   
@@ -45,6 +37,14 @@ const DealerAnalytics = () => {
     safety_days: 3
   })
   const [eoqData, setEoqData] = useState(null)
+
+  // Auto-calculate EOQ when params or product changes
+  useEffect(() => {
+    if (selectedEOQProduct && activeTab === 'eoq') {
+      const timeout = setTimeout(() => fetchEOQ(), 300)
+      return () => clearTimeout(timeout)
+    }
+  }, [selectedEOQProduct, eoqParams, activeTab])
   
   // Reorder recommendations state
   const [reorderData, setReorderData] = useState(null)
@@ -61,19 +61,6 @@ const DealerAnalytics = () => {
       setProducts(res.data?.results || [])
     } catch (err) {
       console.error('Failed to load products:', err)
-    }
-  }
-
-  const fetchForecast = async () => {
-    if (!selectedForecastProduct) return
-    try {
-      setLoading(true)
-      const res = await dealerAPI.getDemandForecast(selectedForecastProduct)
-      setForecastData(res.data)
-    } catch (err) {
-      console.error('Failed to load forecast:', err)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -117,35 +104,10 @@ const DealerAnalytics = () => {
   const formatKSH = (val) => `KSh ${val?.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const tabs = [
-    { id: 'forecast', label: 'Demand Forecast', icon: TrendingUp },
     { id: 'abc', label: 'ABC Analysis', icon: PieChart },
     { id: 'eoq', label: 'EOQ Calculator', icon: Calculator },
     { id: 'reorder', label: 'Reorder Recommendations', icon: AlertCircle },
   ]
-
-  // Prepare forecast chart data
-  const prepareForecastChartData = () => {
-    if (!forecastData) return []
-    
-    const historical = forecastData.historical_data?.map(d => ({
-      date: d.date,
-      actual: d.actual,
-      forecast: d.forecast,
-      lower: d.lower,
-      upper: d.upper,
-      type: 'historical'
-    })) || []
-    
-    const future = forecastData.future_forecast?.map(d => ({
-      date: d.date,
-      forecast: d.forecast,
-      lower: d.lower,
-      upper: d.upper,
-      type: 'forecast'
-    })) || []
-    
-    return [...historical, ...future]
-  }
 
   return (
     <div className="space-y-6 text-slate-900">
@@ -177,118 +139,6 @@ const DealerAnalytics = () => {
           </button>
         ))}
       </div>
-
-      {/* Demand Forecast */}
-      {activeTab === 'forecast' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
-          <GlassCard className="p-4 bg-white/95 border border-slate-200 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-blue-500" />
-                  Demand Forecast
-                </h2>
-                <p className="text-slate-600 text-sm mt-1">Simple exponential smoothing (α = 0.3) with 30-day prediction</p>
-              </div>
-              
-              <div className="flex gap-3">
-                <select
-                  value={selectedForecastProduct}
-                  onChange={(e) => setSelectedForecastProduct(e.target.value)}
-                  className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="" className="bg-gray-800">Select Product</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id} className="bg-gray-800">{p.name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={fetchForecast}
-                  disabled={!selectedForecastProduct || loading}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg transition-colors"
-                >
-                  {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
-                  Generate Forecast
-                </button>
-              </div>
-            </div>
-            
-            {forecastData ? (
-              <>
-                <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">{forecastData.product_name}</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-slate-600 text-sm">Historical Period</p>
-                      <p className="text-slate-900 font-medium">90 days</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm">Forecast Period</p>
-                      <p className="text-slate-900 font-medium">30 days</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm">Alpha (Smoothing)</p>
-                      <p className="text-slate-900 font-medium">{forecastData.alpha}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-600 text-sm">Confidence</p>
-                      <p className="text-slate-900 font-medium">±20%</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={prepareForecastChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="#9ca3af"
-                        tickFormatter={(val) => new Date(val).toLocaleDateString('en-KE', { month: 'short', day: 'numeric' })}
-                      />
-                      <YAxis stroke="#9ca3af" />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f3f4f6' }}
-                        formatter={(value, name) => [value, name]}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString('en-KE')}
-                      />
-                      <Legend />
-                      <Area 
-                        type="monotone" 
-                        dataKey="upper" 
-                        stroke="transparent" 
-                        fill={COLORS.confidence} 
-                        fillOpacity={0.1}
-                        name="Upper Bound"
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="lower" 
-                        stroke="transparent" 
-                        fill="#1f2937"
-                        fillOpacity={1}
-                        name="Lower Bound"
-                      />
-                      <Line type="monotone" dataKey="actual" stroke={COLORS.actual} strokeWidth={2} dot={false} name="Actual Sales" />
-                      <Line type="monotone" dataKey="forecast" stroke={COLORS.forecast} strokeWidth={2} strokeDasharray="5 5" name="Forecast" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-12 text-slate-600">
-                <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Select a product to generate demand forecast</p>
-              </div>
-            )}
-          </GlassCard>
-        </motion.div>
-      )}
 
       {/* ABC Analysis */}
       {activeTab === 'abc' && abcData && (
@@ -474,15 +324,16 @@ const DealerAnalytics = () => {
                 </div>
               </div>
               
-              <div className="flex items-end">
+              <div className="flex flex-col justify-end">
                 <button
                   onClick={fetchEOQ}
                   disabled={!selectedEOQProduct || loading}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
                   {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
-                  Calculate EOQ
+                  {loading ? 'Calculating...' : (eoqData ? 'Recalculate' : 'Calculate EOQ')}
                 </button>
+                <p className="text-xs text-slate-500 mt-2 text-center">Auto-calculates when values change</p>
               </div>
             </div>
             

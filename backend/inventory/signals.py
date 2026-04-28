@@ -1,13 +1,31 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import Inventory
-from analytics.views import AnalyticsViewSet
+import logging
+
+logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Inventory)
-def trigger_analytics_on_stock_change(sender, instance, **kwargs):
+def sync_inventory_to_product(sender, instance, **kwargs):
     """
-    Trigger analytics recalculation or flag for update when inventory changes.
+    Keep dealer inventory aligned with the canonical Inventory record.
+    Product stock fields are not used in this codebase, so we do not
+    touch them here to avoid extra writes and AttributeError noise.
     """
-    # This is a placeholder for actual analytics recalculation logic
-    # In production, call a Celery task or analytics service
-    AnalyticsViewSet().inventory_insights(None)
+    try:
+        product = instance.product
+
+        if not getattr(product, 'dealer', None):
+            return
+
+        try:
+            from dealer.models import DealerInventory
+            dealer_inv = DealerInventory.objects.filter(product=product, dealer=product.dealer).first()
+            if dealer_inv and dealer_inv.stock_quantity != instance.quantity:
+                dealer_inv.stock_quantity = instance.quantity
+                dealer_inv.save(update_fields=['stock_quantity'])
+                logger.info(f"DealerInventory sync: Product {product.id} updated to {instance.quantity}")
+        except Exception as e:
+            logger.warning(f"DealerInventory sync failed: {e}")
+    except Exception as e:
+        logger.error(f"Error syncing Inventory to Product: {e}")
