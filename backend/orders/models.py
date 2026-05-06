@@ -39,6 +39,8 @@ class Order(models.Model):
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    deleted_by_customer = models.BooleanField(default=False, help_text="True if customer deleted this order from their view")
+    deleted_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-created_at']

@@ -36,7 +36,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = '__all__'
-        read_only_fields = ['order_number', 'total_amount', 'created_by']
+        read_only_fields = ['order_number', 'total_amount', 'created_by', 'deleted_by_customer', 'deleted_at']
     
     def get_receipt_url(self, obj):
         """Generate receipt URL for the order"""
@@ -111,7 +111,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                 for pid in missing_inventory:
                     Inventory.objects.get_or_create(
                         product_id=pid,
-                        defaults={'quantity': 0, 'stock_quantity': 0}
+                        defaults={'quantity': 0}
                     )
                 # Refresh inventory lookup
                 inventories = Inventory.objects.filter(product_id__in=product_ids)

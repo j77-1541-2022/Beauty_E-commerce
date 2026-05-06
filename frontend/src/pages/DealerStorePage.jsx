@@ -26,6 +26,7 @@ import { useCart } from '../contexts/CartContext'
 import GlassCard from '../components/ui/GlassCard'
 import AnimatedButton from '../components/ui/AnimatedButton'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { productAPI } from '../services/apiClient'
 import 'leaflet/dist/leaflet.css'
 
 const markerIcon = new L.Icon({
@@ -61,64 +62,40 @@ const DealerStorePage = () => {
   const fetchDealerData = async () => {
     try {
       setLoading(true)
-      // Mock dealer data - replace with actual API call
-      const mockDealer = {
+      const response = await productAPI.getAll({ dealer_id: dealerId, is_active: true })
+      const payload = response?.data
+      const liveProducts = Array.isArray(payload)
+        ? payload
+        : payload?.results || payload?.data || []
+
+      const firstProduct = liveProducts[0]
+      const dealerName = firstProduct?.dealer_business_name || firstProduct?.dealer_info?.business_name || `Dealer ${dealerId}`
+
+      setProducts(liveProducts)
+      setDealer({
         id: dealerId,
-        business_name: 'Glow Beyond Beauty Store',
-        description: 'Premium beauty products curated for the modern Kenyan woman. We specialize in authentic, high-quality skincare and cosmetics from top international brands.',
-        location: 'Nairobi, Kenya',
-        phone: '+254 700 123 456',
-        email: 'contact@glowbeyond.co.ke',
-        rating: 4.8,
-        total_reviews: 156,
-        is_verified: true,
+        business_name: dealerName,
+        description: `Products available from ${dealerName}.`,
+        location: firstProduct?.dealer_info?.location || 'Nairobi, Kenya',
+        phone: firstProduct?.dealer_info?.whatsapp_number || '',
+        email: firstProduct?.dealer_info?.business_email || '',
+        rating: 0,
+        total_reviews: 0,
+        is_verified: firstProduct?.dealer_info?.is_verified ?? true,
         member_since: '2023',
-        total_products: 45,
-        total_sales: 1250,
+        total_products: liveProducts.length,
+        total_sales: 0,
         business_hours: 'Mon-Sat: 9AM - 8PM',
         latitude: -1.286389,
         longitude: 36.817223,
         image: '/images/beauty.jpg'
-      }
-      
-      const mockProducts = [
-        {
-          id: 1,
-          name: 'Rose Gold Serum',
-          price: 89.99,
-          rating: 4.8,
-          stock: 15,
-          image: '/images/placeholders/treatment.svg',
-          product_type: 'treatment',
-          category: 'Skincare'
-        },
-        {
-          id: 2,
-          name: 'Diamond Cream',
-          price: 129.99,
-          rating: 4.9,
-          stock: 8,
-          image: '/images/placeholders/skincare.svg',
-          product_type: 'skincare',
-          category: 'Skincare'
-        },
-        {
-          id: 3,
-          name: 'Pearl Mask Set',
-          price: 59.99,
-          rating: 4.7,
-          stock: 20,
-          image: '/images/placeholders/treatment.svg',
-          product_type: 'treatment',
-          category: 'Face Masks'
-        }
-      ]
-      
-      setDealer(mockDealer)
-      setProducts(mockProducts)
-      setRating(mockDealer.rating)
+      })
+      setRating(0)
     } catch (error) {
       console.error('Failed to fetch dealer data:', error)
+      setDealer(null)
+      setProducts([])
+      setRating(0)
     } finally {
       setLoading(false)
     }
@@ -139,6 +116,20 @@ const DealerStorePage = () => {
       addToCompare(product)
     }
   }
+
+  const visibleBrands = products.reduce((accumulator, product) => {
+    const brandName = product.brand_name || product.brand
+    if (!brandName || accumulator.some((brand) => brand.name === brandName)) {
+      return accumulator
+    }
+
+    accumulator.push({
+      id: brandName,
+      name: brandName,
+      category: product.category_name || 'Beauty'
+    })
+    return accumulator
+  }, [])
 
   if (loading) {
     return <LoadingSpinner />
@@ -265,6 +256,35 @@ const DealerStorePage = () => {
           </GlassCard>
         </motion.div>
 
+        {/* Brands Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mb-8"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={`text-2xl font-bold ${colors.text}`}>Brands in this store</h2>
+            <p className={`${colors.textMuted}`}>{brands.length} brands featured</p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {visibleBrands.map((brand) => (
+              <GlassCard key={brand.id} className="p-4 text-center" hover>
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 text-white font-bold">
+                  {brand.name
+                    .split(' ')
+                    .map((word) => word[0])
+                    .slice(0, 2)
+                    .join('')}
+                </div>
+                <h3 className={`font-semibold ${colors.text} text-sm`}>{brand.name}</h3>
+                <p className={`text-xs ${colors.textMuted} mt-1`}>{brand.category}</p>
+              </GlassCard>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Products Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -324,21 +344,22 @@ const DealerStorePage = () => {
                   </div>
                   <div className="p-4">
                     <h3 className={`font-semibold ${colors.text} mb-2`}>{product.name}</h3>
+                    <p className={`text-xs ${colors.textMuted} mb-2`}>{product.brand_name || product.brand || 'Unknown brand'}</p>
                     <div className="flex items-center gap-1 mb-2">
                       <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className={`text-sm ${colors.textMuted}`}>{product.rating}</span>
+                      <span className={`text-sm ${colors.textMuted}`}>{product.rating ?? 0}</span>
                     </div>
                     <div className="flex items-center justify-between mb-3">
                       <p className={`text-lg font-bold ${colors.accent}`}>
-                        {formatPrice(product.price)}
+                        {formatPrice(product.selling_price ?? product.price ?? 0)}
                       </p>
-                      <p className={`text-xs ${product.stock > 5 ? 'text-green-500' : product.stock > 0 ? 'text-amber-500' : 'text-red-500'}`}>
-                        {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                      <p className={`text-xs ${product.stock_quantity > 5 ? 'text-green-500' : product.stock_quantity > 0 ? 'text-amber-500' : 'text-red-500'}`}>
+                        {product.stock_quantity > 0 ? `${product.stock_quantity} in stock` : 'Out of stock'}
                       </p>
                     </div>
                     <AnimatedButton
                       onClick={() => handleAddToCart(product)}
-                      disabled={product.stock === 0}
+                      disabled={(product.stock_quantity ?? 0) === 0}
                       className="w-full"
                     >
                       <ShoppingBag className="w-4 h-4 mr-2" />

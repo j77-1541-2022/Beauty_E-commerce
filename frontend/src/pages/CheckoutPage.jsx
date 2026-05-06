@@ -278,9 +278,10 @@ const CheckoutPage = () => {
     setLoading(true)
     setGlobalLoading('checkout.placeOrder', true)
     showNotification('Processing your order...', 'info')
+    let orderPayload = null
     try {
       // Create order first
-      const orderPayload = {
+      orderPayload = {
         customer_name: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
         customer_email: shippingInfo.email,
         customer_phone: normalizeKenyanPhone(shippingInfo.phone),
@@ -338,6 +339,26 @@ const CheckoutPage = () => {
         const paymentResponseResult = await runMpesaRetry({ orderId: createdOrder.id, phoneNumber: mpesaPhone })
 
         if (!paymentResponseResult.ok) {
+          // Fallback to demo payment in development when M-Pesa is unavailable
+          if (import.meta.env.DEV) {
+            try {
+              showNotification('M-Pesa unavailable. Processing test payment...', 'info')
+              const demoResponse = await paymentAPI.demoPayment({
+                order_id: createdOrder.id,
+                payment_method: 'mpesa',
+              })
+              setReceiptUrl(demoResponse?.data?.data?.receipt_url || demoResponse?.data?.receipt_url || '')
+              setOrderPlaced(true)
+              setPaymentStatus('completed')
+              showNotification('Test payment completed. You can now download your receipt.', 'success')
+              setLoading(false)
+              setGlobalLoading('checkout.placeOrder', false)
+              return
+            } catch (demoError) {
+              console.error('Demo payment fallback failed:', demoError)
+            }
+          }
+
           setPaymentStatus('failed')
           setLoading(false)
           setGlobalLoading('checkout.placeOrder', false)

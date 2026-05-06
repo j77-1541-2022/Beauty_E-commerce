@@ -3,7 +3,10 @@ URL configuration for users app.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AuthViewSet, register_view, login_view, logout_view, token_refresh_view, profile_view, update_profile_view, dashboard_view
+from .views import (
+    AuthViewSet, register_view, login_view, logout_view, token_refresh_view,
+    profile_view, update_profile_view, dashboard_view, forgot_password_view, reset_password_view
+)
 
 router = DefaultRouter()
 router.register(r'auth', AuthViewSet, basename='auth')
@@ -25,4 +28,8 @@ urlpatterns = [
     
     # Dashboard endpoint
     path('dashboard/', dashboard_view, name='dashboard'),
+    
+    # Password reset endpoints
+    path('auth/password/forgot/', forgot_password_view, name='forgot_password'),
+    path('auth/password/reset/', reset_password_view, name='reset_password'),
 ]

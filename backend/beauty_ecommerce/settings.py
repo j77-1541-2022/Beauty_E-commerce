@@ -253,7 +253,24 @@ MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
 MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
 MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')  # Sandbox test shortcode
 MPESA_PASSKEY = config('MPESA_PASSKEY', default='bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919')
-MPESA_CALLBACK_URL = config('MPESA_CALLBACK_URL', default='https://your-ngrok-url.ngrok-free.app/api/payments/callback/')
+
+
+def _normalize_mpesa_callback_url(raw_url: str) -> str:
+    raw_url = (raw_url or '').strip()
+    if not raw_url:
+        return 'https://your-ngrok-url.ngrok-free.app/api/v1/payments/callback/'
+
+    if raw_url.startswith('http://') or raw_url.startswith('https://'):
+        if '/api/' not in raw_url:
+            return raw_url.rstrip('/') + '/api/v1/payments/callback/'
+        return raw_url.rstrip('/') + '/'
+
+    return f'https://{raw_url.lstrip("/").rstrip("/")}/api/v1/payments/callback/'
+
+
+MPESA_CALLBACK_URL = _normalize_mpesa_callback_url(
+    config('MPESA_CALLBACK_URL', default='https://your-ngrok-url.ngrok-free.app/api/v1/payments/callback/')
+)
 MPESA_ENV = config('MPESA_ENV', default='sandbox')  # 'sandbox' or 'production'
 MPESA_REQUEST_TIMEOUT = config('MPESA_REQUEST_TIMEOUT', default=30, cast=int)
 MPESA_CALLBACK_VALIDATION_KEY = config('MPESA_CALLBACK_VALIDATION_KEY', default='')

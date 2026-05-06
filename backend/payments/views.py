@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
@@ -9,6 +10,7 @@ from rest_framework.response import Response
 
 from orders.models import Order
 from orders.services import OrderStatusManager
+from orders.serializers import OrderSerializer
 from utils.api_response import build_error_response, build_success_response
 
 from .models import Payment, PaymentCallback
@@ -19,6 +21,30 @@ from .serializers import (
     PaymentSerializer,
     PaymentStatusSerializer,
 )
+
+
+def _complete_payment_for_dev(payment, *, receipt_prefix='DEMO', changed_by=None, notes='Development payment fallback'):
+    """Mark a pending payment and its order as paid in development when Daraja is unavailable."""
+    receipt_number = f"{receipt_prefix}-{payment.order.order_number}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+
+    with transaction.atomic():
+        payment = Payment.objects.select_for_update().get(pk=payment.pk)
+        payment.status = 'completed'
+        payment.payment_method = payment.payment_method or 'mpesa'
+        payment.receipt_number = receipt_number
+        payment.mpesa_receipt_number = payment.mpesa_receipt_number or receipt_number
+        payment.save(update_fields=['status', 'payment_method', 'receipt_number', 'mpesa_receipt_number', 'updated_at'])
+
+        order = payment.order
+        if order.status != 'paid' and order.status not in {'cancelled', 'delivered'}:
+            OrderStatusManager.update_status(
+                order=order,
+                new_status='paid',
+                changed_by=changed_by,
+                notes=notes,
+            )
+
+    return payment
 
 
 @api_view(['POST'])
@@ -151,6 +177,8 @@ def payment_callback(request):
                 'payment_status': payment.status,
                 'order_id': payment.order_id,
                 'order_status': payment.order.status,
+                'receipt_url': f'/api/v1/orders/{payment.order_id}/receipt/' if payment.order.status == 'paid' else None,
+                'receipt_number': payment.receipt_number or payment.mpesa_receipt_number,
             },
         ),
         status=status.HTTP_200_OK,
@@ -221,6 +249,33 @@ def initiate_payment(request):
             )
 
         if not token_response.get('success'):
+            error_text = ' '.join([
+                str(token_response.get('message') or ''),
+                str(token_response.get('error') or ''),
+                str(token_response.get('details') or ''),
+            ]).lower()
+
+            if settings.DEBUG and ('403' in error_text or 'incapsula' in error_text):
+                payment = _complete_payment_for_dev(
+                    payment,
+                    receipt_prefix='DEMO',
+                    changed_by=request.user,
+                    notes='M-Pesa unavailable in development; payment completed with demo fallback.',
+                )
+                return Response(
+                    build_success_response(
+                        message='M-Pesa unavailable in development. Demo payment completed.',
+                        data={
+                            'payment': PaymentSerializer(payment).data,
+                            'order_id': order.id,
+                            'order_status': payment.order.status,
+                            'receipt_url': f'/api/v1/orders/{order.id}/receipt/',
+                            'order': OrderSerializer(payment.order).data,
+                        },
+                    ),
+                    status=status.HTTP_200_OK,
+                )
+
             payment.status = 'failed'
             payment.save(update_fields=['status'])
             return Response(
@@ -243,6 +298,7 @@ def initiate_payment(request):
                     'payment': PaymentSerializer(payment).data,
                     'order_id': order.id,
                     'order_status': order.status,
+                    'order': OrderSerializer(order).data,  # Include full order data for frontend
                 },
             ),
             status=status.HTTP_200_OK,
@@ -363,6 +419,15 @@ def payment_status(request, order_id):
             elif result_code in {1, 1032, 2001}:
                 payment.status = 'cancelled' if result_code == 1032 else 'failed'
                 payment.save(update_fields=['status', 'updated_at'])
+        else:
+            query_error = str(query_response.get('error') or '').lower()
+            if settings.DEBUG and ('403' in query_error or 'incapsula' in query_error):
+                payment = _complete_payment_for_dev(
+                    payment,
+                    receipt_prefix='DEMO',
+                    changed_by=None,
+                    notes='M-Pesa status query blocked in development; completed with demo fallback.',
+                )
 
     return Response(
         build_success_response(
@@ -371,7 +436,86 @@ def payment_status(request, order_id):
                 'payment': PaymentStatusSerializer(payment).data,
                 'order_id': order.id,
                 'order_status': order.status,
+                'receipt_url': f'/api/v1/orders/{order.id}/receipt/' if order.status == 'paid' else None,
+                'receipt_number': payment.receipt_number or payment.mpesa_receipt_number if payment else None,
             },
         ),
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def demo_payment(request):
+    """Demo/Test payment endpoint - immediately marks order as paid for testing"""
+    from django.conf import settings
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Only allow in DEBUG mode
+    if not settings.DEBUG:
+        return Response(
+            build_error_response(message='This endpoint is only available in development mode', code='DISABLED'),
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    
+    try:
+        order_id = request.data.get('order_id')
+        payment_method = request.data.get('payment_method', 'demo')
+        
+        if not order_id:
+            return Response(
+                build_error_response(message='order_id is required', code='VALIDATION_ERROR'),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        order = Order.objects.filter(id=order_id, created_by=request.user).first()
+        if not order:
+            return Response(
+                build_error_response(message='Order not found', code='NOT_FOUND'),
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        # Create demo payment record
+        demo_receipt = f"DEMO-{order.order_number}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+        with transaction.atomic():
+            payment = Payment.objects.create(
+                order=order,
+                payment_method=payment_method,
+                phone_number=order.customer_phone or '',
+                amount=order.total_amount,
+                receipt_number=demo_receipt,
+                status='completed',
+            )
+            
+            # Update order status to paid
+            if order.status != 'paid' and order.status not in {'cancelled', 'delivered'}:
+                OrderStatusManager.update_status(
+                    order=order,
+                    new_status='paid',
+                    changed_by=request.user,
+                    notes=f'Demo payment processed. Receipt: {demo_receipt}',
+                )
+            
+            logger.info(f"Demo payment recorded for order {order.order_number}")
+        
+        order.refresh_from_db(fields=['status'])
+        return Response(
+            build_success_response(
+                message='Demo payment recorded successfully',
+                data={
+                    'payment': PaymentSerializer(payment).data,
+                    'receipt_number': demo_receipt,
+                    'receipt_url': f'/api/v1/orders/{order.id}/receipt/',
+                    'order_id': order.id,
+                    'order_status': order.status,
+                },
+            ),
+            status=status.HTTP_201_CREATED,
+        )
+    except Exception as e:
+        logger.error(f"Demo payment error: {str(e)}")
+        return Response(
+            build_error_response(message=f'Demo payment error: {str(e)}', code='PAYMENT_ERROR'),
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

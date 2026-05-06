@@ -27,6 +27,8 @@ import PageTransition from './components/PageTransition'
 // Lazy load pages
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'))
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'))
 const UnauthorizedPage = lazy(() => import('./pages/errors/UnauthorizedPage'))
 const NotFoundPage = lazy(() => import('./pages/errors/NotFoundPage'))
 
@@ -120,6 +122,22 @@ function AppRoutes() {
           <PublicOnlyRoute>
             <Suspense fallback={<LoadingScreen />}>
               <PageWrapper><RegisterPage /></PageWrapper>
+            </Suspense>
+          </PublicOnlyRoute>
+        } />
+
+        <Route path="/forgot-password" element={
+          <PublicOnlyRoute>
+            <Suspense fallback={<LoadingScreen />}>
+              <PageWrapper><ForgotPassword /></PageWrapper>
+            </Suspense>
+          </PublicOnlyRoute>
+        } />
+
+        <Route path="/reset-password" element={
+          <PublicOnlyRoute>
+            <Suspense fallback={<LoadingScreen />}>
+              <PageWrapper><ResetPassword /></PageWrapper>
             </Suspense>
           </PublicOnlyRoute>
         } />

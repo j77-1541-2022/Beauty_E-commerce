@@ -23,18 +23,29 @@ def get_celery_config():
     """
     Determine if Redis is available; if not, configure Celery for synchronous execution.
     """
-    import redis
+    # Perform a lightweight socket check to avoid redis-py's retry/backoff
+    # which can block Django startup when Redis is unreachable.
+    from urllib.parse import urlparse
+    import socket
+
     try:
-        # Test Redis connection
-        r = redis.Redis.from_url(CELERY_BROKER_URL, socket_connect_timeout=2)
-        r.ping()
+        parsed = urlparse(CELERY_BROKER_URL)
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or (6379 if parsed.scheme.startswith('redis') else None)
+        if port is None:
+            raise ValueError('No port found for broker URL')
+
+        # quick socket connect with short timeout
+        sock = socket.create_connection((host, port), timeout=1)
+        sock.close()
+
         return {
             'broker': CELERY_BROKER_URL,
             'result_backend': CELERY_RESULT_BACKEND,
             'mode': 'async',
         }
-    except (redis.ConnectionError, redis.BusyLoadingError, Exception):
-        # Redis unavailable; use synchronous mode
+    except Exception:
+        # Redis unreachable or parse error; fall back to synchronous execution
         return {
             'broker': 'memory://',
             'result_backend': 'cache',

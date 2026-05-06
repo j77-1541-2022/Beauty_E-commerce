@@ -25,6 +25,21 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
     ordering_fields = ['created_at', 'total_amount']
     ordering = ['-created_at']
     
+    def get_queryset(self):
+        """Filter orders based on user role and deletion status."""
+        queryset = Order.objects.prefetch_related('items', 'status_history')
+        user = self.request.user
+        
+        if user.role == 'admin':
+            # Admins see all orders
+            return queryset
+        elif user.role == 'dealer':
+            # Dealers see all orders (including customer-deleted) from their products
+            return queryset.filter(items__product__dealer=user)
+        else:
+            # Customers see only their own orders that are NOT customer-deleted
+            return queryset.filter(created_by=user, deleted_by_customer=False)
+    
     def get_serializer_class(self):
         if self.action == 'create':
             return OrderCreateSerializer
@@ -192,7 +207,12 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
         serializer.save(created_by=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
-        """Allow customers to remove old completed/cancelled orders from history."""
+        """
+        Handle order deletion with different logic for customers vs dealers:
+        - Customers: soft-delete (mark as deleted_by_customer)
+        - Dealers: hard-delete
+        - Admins: hard-delete
+        """
         order = self.get_object()
 
         if request.user.role != 'admin' and order.created_by_id != request.user.id:
@@ -202,8 +222,8 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        # Keep active lifecycle orders from being deleted mid-fulfillment.
-        if request.user.role != 'admin' and order.status not in ['delivered', 'cancelled', 'refunded']:
+        # Keep active lifecycle orders from being deleted mid-fulfillment for customers
+        if request.user.role not in ['admin', 'dealer'] and order.status not in ['delivered', 'cancelled', 'refunded']:
             return self.error_response(
                 message='Only delivered or cancelled orders can be deleted from history.',
                 code='INVALID_ORDER_STATE',
@@ -212,6 +232,19 @@ class OrderViewSet(viewsets.ModelViewSet, APIResponseMixin):
 
         order_id = order.id
         order_number = order.order_number
+        
+        # If customer is deleting a completed order, soft-delete it
+        if request.user.role == 'customer' or (request.user.role != 'admin' and request.user.role != 'dealer'):
+            order.deleted_by_customer = True
+            order.deleted_at = timezone.now()
+            order.save()
+            return self.success_response(
+                data={'order_id': order_id, 'order_number': order_number},
+                message='Order removed from your history',
+                status_code=status.HTTP_200_OK,
+            )
+        
+        # Dealers and admins can hard-delete
         self.perform_destroy(order)
 
         return self.success_response(

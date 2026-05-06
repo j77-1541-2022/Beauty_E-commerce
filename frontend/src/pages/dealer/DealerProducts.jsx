@@ -32,10 +32,21 @@ const formatApiError = (payload) => {
   if (Array.isArray(payload)) return payload.filter(Boolean).join(', ')
   if (typeof payload === 'object') {
     if (typeof payload.error === 'string') return payload.error
+    if (payload.error && typeof payload.error === 'object') {
+      if (typeof payload.error.message === 'string') return payload.error.message
+      if (typeof payload.error.detail === 'string') return payload.error.detail
+      if (typeof payload.error.error === 'string') return payload.error.error
+    }
+    if (typeof payload.message === 'string') return payload.message
     if (typeof payload.detail === 'string') return payload.detail
 
     const details = Object.entries(payload)
       .map(([field, value]) => {
+        if (field === 'error' && value && typeof value === 'object') {
+          if (typeof value.message === 'string') return `error: ${value.message}`
+          if (typeof value.detail === 'string') return `error: ${value.detail}`
+          return `error: ${JSON.stringify(value)}`
+        }
         if (Array.isArray(value)) return `${field}: ${value.join(', ')}`
         if (value && typeof value === 'object') return `${field}: ${JSON.stringify(value)}`
         return `${field}: ${value}`
@@ -648,11 +659,11 @@ const DealerProducts = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black bg-opacity-50 p-4 sm:items-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-xl p-6 w-full max-w-md mx-4"
+            className="w-full max-w-4xl rounded-xl bg-white p-4 sm:p-6"
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">
@@ -675,7 +686,7 @@ const DealerProducts = () => {
               {/* Image Upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
-                <div className="flex items-center space-x-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   <div className="flex-1">
                     <input
                       type="file"
@@ -757,7 +768,7 @@ const DealerProducts = () => {
                   rows={3}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <select
@@ -803,7 +814,7 @@ const DealerProducts = () => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
                   <input
@@ -828,7 +839,7 @@ const DealerProducts = () => {
               {/* Expiry Information */}
               <div className="border-t pt-4 mt-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Product Expiry Information</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
                     <input

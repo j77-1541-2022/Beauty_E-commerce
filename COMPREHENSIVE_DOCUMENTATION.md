@@ -40,12 +40,19 @@ Glow Beyond Beauty is a role-based beauty e-commerce platform with customer, dea
 - ⚠️ M-Pesa sandbox callbacks can be inconsistent
 - ⚠️ Card payment is simulated (not connected to real processor)
 
-### Recent Changes (April 26, 2026)
-- **Dealer Dashboard**: Reorganized into 4 tabs (Overview, Analytics, Support, Account) for cleaner UX
-- **DSS Insights**: Removed Demand Forecast to focus on core features; kept ABC Analysis, EOQ Calculator, and Reorder Recommendations
-- **Payment Error Handling**: Enhanced error handling in `initiate_payment` with detailed logging
-- **Code Cleanup**: Removed unused forecast code from frontend and backend
-- **Documentation**: Consolidated all docs into single comprehensive file
+### Recent Changes (May 3, 2026)
+- **Payment Flow Complete**: Fixed end-to-end payment process with dynamic status updates
+  - Order creation → Payment initiation → Status update → Receipt generation
+  - All payment responses now include receipt_url for immediate download
+  - Cash and M-Pesa flows fully integrated
+  - Demo payment endpoint enabled for testing when M-Pesa unavailable
+- **Receipt Integration**: Receipts now available immediately after payment
+  - Order serializer includes receipt_url in all responses
+  - Payment status endpoint returns download URL
+  - Customers can download PDF receipts after payment confirmation
+- **API Client Fix**: Frontend paymentsAPI consolidated with apiClient for consistency
+- **Payment Documentation**: Added complete flow guide at `backend/PAYMENT_FLOW_GUIDE.md`
+- **Payment Testing**: Added `test_payment_simple.py` for quick flow verification
 
 ---
 
@@ -269,6 +276,19 @@ MPESA_ENV=sandbox
 - **Order Management**: View and fulfill customer orders
 - **Notifications**: Real-time order and stock alerts
 
+### Dealer Product Seeding and Shop Availability
+- **Dealer-specific catalog seeding**: The project includes `backend/products/management/commands/add_dealer_products.py`, which seeds 10 real brands and 10 real products for a target dealer account.
+- **Target dealer account**: `simonekinyua8@gmail.com` is used as the dealer seed target in the command.
+- **Data ownership**: Seeded products are linked to the dealer's `DealerProfile` and created as normal database records, not mock data.
+- **Inventory records**: Each seeded product also receives a matching `DealerInventory` row so it is immediately available in the dealer portal.
+- **Brand selection**: The dealer product form now uses the live `Brand` table, so newly created brands appear in the dropdown when adding or editing products.
+- **Shop visibility**: The dealer store page fetches products from the live API using the dealer filter, so the seeded products appear in the shop and dealer storefront views.
+
+### Relevant API Behavior
+- `GET /api/v1/products/?dealer_id=<id>` returns live products for one dealer.
+- `GET /api/v1/dealer/products/` returns the dealer's own product list for the dealer portal.
+- `GET /api/v1/products/brands/` returns the available brands for product creation and editing.
+
 ### Dealer Inventory Model
 ```python
 class DealerInventory(models.Model):
@@ -366,6 +386,12 @@ ws.onmessage = (e) => console.log('Message:', e.data);
 - **Added**: WebSocket configuration and testing guides
 - **Files**: `WEBSOCKET_REDIS_SETUP.md`, updated `.env` examples
 
+#### 6. **Dealer Product Seeding and Live Shop Data**
+- **Added**: Management command to seed real brands and products for the dealer account `simonekinyua8@gmail.com`
+- **Added**: Dealer storefront now reads live dealer-filtered products from the backend API instead of mock data
+- **Added**: Dealer product form brand dropdown uses the live `Brand` table
+- **Files**: `backend/products/management/commands/add_dealer_products.py`, `frontend/src/pages/DealerStorePage.jsx`
+
 ---
 
 ## 🧪 Testing & Validation
@@ -376,6 +402,24 @@ cd backend
 python manage.py check
 python manage.py test orders.tests wishlist.tests --verbosity 1
 ```
+
+### Payment Flow Test
+```bash
+cd backend
+# Quick test of complete payment flow (order → payment → receipt)
+python manage.py shell < test_payment_simple.py
+
+# For detailed debugging:
+python payment_diagnostic.py
+```
+
+The payment flow test verifies:
+1. User authentication and tokens
+2. Order creation with items
+3. Cash payment recording
+4. Order status update to "paid"
+5. Receipt generation and download
+6. Payment status endpoints
 
 ### Frontend Tests
 ```bash

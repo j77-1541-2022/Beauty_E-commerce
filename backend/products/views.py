@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 from django.db.models import Q
 import logging
 
@@ -42,7 +43,7 @@ class ProductViewSet(viewsets.ModelViewSet, APIResponseMixin):
     filterset_fields = ['category', 'brand', 'product_type', 'is_active', 'dealer']
     search_fields = ['name', 'sku', 'description', 'brand__name', 'category__name']
     ordering_fields = ['name', 'created_at', 'selling_price', 'cost_price', 'rating']
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_permissions(self):
@@ -50,10 +51,14 @@ class ProductViewSet(viewsets.ModelViewSet, APIResponseMixin):
         if self.action in ['list', 'retrieve', 'search', 'by_category', 'by_dealer', 'by_brand']:
             return [ReadOnly()]
         elif self.action in ['create']:
-            return [IsAdminUser | IsVerifiedDealer]
+            # Allow admins or verified dealers to create products
+            from utils.permissions import IsAdminOrVerifiedDealer
+            return [IsAdminOrVerifiedDealer()]
         elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAdminUser]
-        return [IsAdminUser | IsVerifiedDealer]
+            return [IsAdminUser()]
+        # Default: allow admins or verified dealers for other actions
+        from utils.permissions import IsAdminOrVerifiedDealer
+        return [IsAdminOrVerifiedDealer()]
 
     def get_serializer_class(self):
         """Select serializer based on action and user role"""

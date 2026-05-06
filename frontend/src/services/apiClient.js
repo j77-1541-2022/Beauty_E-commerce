@@ -172,6 +172,7 @@ export const paymentAPI = {
   initiate: (data) => apiClient.post('/payments/initiate/', data),
   getStatus: (orderId) => apiClient.get(`/payments/status/${orderId}/`),
   recordCash: (data) => apiClient.post('/payments/cash/', data),
+  demoPayment: (data) => apiClient.post('/payments/demo/', data),
 };
 
 export const dealerAPI = {

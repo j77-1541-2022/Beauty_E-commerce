@@ -14,6 +14,9 @@ from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
 
 from .models import UserProfile, CustomerProfile, DealerProfile
 from .serializers import (
@@ -503,6 +506,68 @@ def login_view(request):
                 'traceback': traceback.format_exc()
             }
         }, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password_view(request):
+    """Initiate password reset: POST { email }"""
+    email = request.data.get('email', '').strip().lower()
+    if not email:
+        return Response({'success': False, 'error': {'code': 'VALIDATION_ERROR', 'message': 'Email is required.'}}, status=400)
+
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        # Don't reveal whether the email exists
+        return Response({'success': True, 'message': 'If an account exists for this email, a reset link has been sent.'})
+
+    # Generate token and uid
+    token = default_token_generator.make_token(user)
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+    # Build frontend reset URL (client handles showing reset form)
+    frontend_reset_url = f"{getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')}/reset-password?uid={uid}&token={token}"
+
+    subject = 'Reset your Glow Beyond Beauty password'
+    message = f"Hi {user.first_name or user.username},\n\nTo reset your password click the link below:\n\n{frontend_reset_url}\n\nIf you did not request this, ignore this email."
+
+    try:
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
+    except Exception as e:
+        # Log, but return success to avoid user enumeration
+        print('Failed to send password reset email:', e)
+
+    return Response({'success': True, 'message': 'If an account exists for this email, a reset link has been sent.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password_view(request):
+    """Confirm password reset: POST { uid, token, new_password }"""
+    uid = request.data.get('uid')
+    token = request.data.get('token')
+    new_password = request.data.get('new_password')
+
+    if not uid or not token or not new_password:
+        return Response({'success': False, 'error': {'code': 'VALIDATION_ERROR', 'message': 'uid, token and new_password are required.'}}, status=400)
+
+    try:
+        uid_decoded = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=uid_decoded)
+    except Exception:
+        return Response({'success': False, 'error': {'code': 'INVALID_TOKEN', 'message': 'Invalid reset token.'}}, status=400)
+
+    if not default_token_generator.check_token(user, token):
+        return Response({'success': False, 'error': {'code': 'INVALID_TOKEN', 'message': 'Invalid or expired reset token.'}}, status=400)
+
+    # Validate password strength using existing validators (optional)
+    try:
+        user.set_password(new_password)
+        user.save()
+        return Response({'success': True, 'message': 'Password has been reset successfully.'})
+    except Exception as e:
+        return Response({'success': False, 'error': {'code': 'SERVER_ERROR', 'message': 'Failed to reset password.'}}, status=500)
 
 
 @api_view(['POST'])
