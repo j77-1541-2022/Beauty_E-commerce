@@ -1,5 +1,6 @@
 from pathlib import Path
 from decouple import config
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -110,12 +111,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'beauty_ecommerce.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database configuration - PostgreSQL for production, SQLite for local
+DATABASE_URL = config('DATABASE_URL', default='sqlite:///db.sqlite3')
+if DATABASE_URL == 'sqlite:///db.sqlite3':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
 
 AUTH_USER_MODEL = 'users.User'
 
