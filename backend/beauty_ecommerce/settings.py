@@ -24,7 +24,18 @@ def _parse_debug_value(raw_value, default=True):
 
 DEBUG = _parse_debug_value(config('DEBUG', default='True'))
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver', '.railway.app', '*.up.railway.app']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
+
+# Add Railway domains
+ALLOWED_HOSTS.extend([
+    '.railway.app',
+    '*.up.railway.app',
+    'beautye-commerce-production.up.railway.app',
+])
+
+# Allow custom domain if provided
+if CUSTOM_DOMAIN := config('CUSTOM_DOMAIN', default=None):
+    ALLOWED_HOSTS.append(CUSTOM_DOMAIN)
 
 # Allow temporary ngrok callback hosts during local development.
 if DEBUG:
@@ -75,6 +86,12 @@ MIDDLEWARE = [
 ]
 
 # Section G5 - Production Security Settings
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.railway.app',
+    'https://*.up.railway.app',
+    'https://beautye-commerce-production.up.railway.app',
+]
+
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
