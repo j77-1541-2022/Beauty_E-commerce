@@ -45,8 +45,6 @@ if CUSTOM_DOMAIN:
 if DEBUG:
     ALLOWED_HOSTS += ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io']
 
-print(f"DEBUG: ALLOWED_HOSTS = {ALLOWED_HOSTS}")  # Debug log
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
