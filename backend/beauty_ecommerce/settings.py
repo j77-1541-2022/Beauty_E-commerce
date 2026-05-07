@@ -24,22 +24,28 @@ def _parse_debug_value(raw_value, default=True):
 
 DEBUG = _parse_debug_value(config('DEBUG', default='True'))
 
+# Build ALLOWED_HOSTS list
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
 
-# Add Railway domains (leading dot matches any subdomain)
+# Add Railway production domain explicitly
+ALLOWED_HOSTS.append('beautye-commerce-production.up.railway.app')
+
+# Add Railway domain patterns (leading dot for subdomains)
 ALLOWED_HOSTS.extend([
     '.railway.app',
     '.up.railway.app',
-    'beautye-commerce-production.up.railway.app',
 ])
 
-# Allow custom domain if provided
-if CUSTOM_DOMAIN := config('CUSTOM_DOMAIN', default=None):
+# Allow custom domain if provided via environment variable
+CUSTOM_DOMAIN = config('CUSTOM_DOMAIN', default='')
+if CUSTOM_DOMAIN:
     ALLOWED_HOSTS.append(CUSTOM_DOMAIN)
 
 # Allow temporary ngrok callback hosts during local development.
 if DEBUG:
     ALLOWED_HOSTS += ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.io']
+
+print(f"DEBUG: ALLOWED_HOSTS = {ALLOWED_HOSTS}")  # Debug log
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -75,7 +81,6 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise for static files in production
-    'beauty_ecommerce.railway_middleware.RailwayProxyHeadersMiddleware',  # Handle Railway proxy headers
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
