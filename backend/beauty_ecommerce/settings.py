@@ -30,11 +30,15 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
 # Add Railway production domain explicitly
 ALLOWED_HOSTS.append('beautye-commerce-production.up.railway.app')
 
-# Add Railway domain patterns (leading dot for subdomains)
+# Add Railway domain patterns (leading dot for subdomains - these match subdomains like *.railway.app)
 ALLOWED_HOSTS.extend([
     '.railway.app',
     '.up.railway.app',
 ])
+
+# Allow all hosts in production (fallback) - Railway will handle routing at load balancer level
+if not DEBUG:
+    ALLOWED_HOSTS.append('*')
 
 # Allow custom domain if provided via environment variable
 CUSTOM_DOMAIN = config('CUSTOM_DOMAIN', default='')
