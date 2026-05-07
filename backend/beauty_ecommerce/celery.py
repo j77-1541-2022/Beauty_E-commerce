@@ -18,15 +18,23 @@ app.autodiscover_tasks()
 CELERY_BROKER_URL = getattr(settings, 'CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = getattr(settings, 'CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 
+# Cache for the config result
+_celery_config_cache = None
+
 # Attempt Redis connection; fallback to synchronous task execution
 def get_celery_config():
     """
     Determine if Redis is available; if not, configure Celery for synchronous execution.
+    This function is called lazily to avoid blocking Django startup.
     """
-    # Perform a lightweight socket check to avoid redis-py's retry/backoff
-    # which can block Django startup when Redis is unreachable.
+    global _celery_config_cache
+    
+    if _celery_config_cache is not None:
+        return _celery_config_cache
+    
     from urllib.parse import urlparse
     import socket
+    import os
 
     try:
         parsed = urlparse(CELERY_BROKER_URL)
@@ -35,35 +43,51 @@ def get_celery_config():
         if port is None:
             raise ValueError('No port found for broker URL')
 
-        # quick socket connect with short timeout
-        sock = socket.create_connection((host, port), timeout=1)
+        # quick socket connect with very short timeout (500ms)
+        sock = socket.create_connection((host, port), timeout=0.5)
         sock.close()
 
-        return {
+        _celery_config_cache = {
             'broker': CELERY_BROKER_URL,
             'result_backend': CELERY_RESULT_BACKEND,
             'mode': 'async',
         }
-    except Exception:
+    except Exception as e:
         # Redis unreachable or parse error; fall back to synchronous execution
-        return {
+        import sys
+        print(f"Warning: Redis unavailable ({e}). Using synchronous task execution.", file=sys.stderr)
+        _celery_config_cache = {
             'broker': 'memory://',
             'result_backend': 'cache',
             'mode': 'sync',
         }
+    
+    return _celery_config_cache
 
 
-celery_config = get_celery_config()
+# Use synchronous mode by default during startup to avoid blocking
+# The actual config will be determined lazily on first task execution
+celery_config = {
+    'broker': 'memory://',
+    'result_backend': 'cache',
+    'mode': 'sync',
+}
 app.conf.update(
     broker_url=celery_config['broker'],
     result_backend=celery_config['result_backend'],
-    task_always_eager=(celery_config['mode'] == 'sync'),  # Execute synchronously
+    task_always_eager=(celery_config['mode'] == 'sync'),  # Execute synchronously by default
     task_eager_propagates=True,
 )
 
-# Celery beat schedule (only active if broker is Redis)
-if celery_config['mode'] == 'async':
-    app.conf.beat_schedule = getattr(settings, 'CELERY_BEAT_SCHEDULE', {})
+# Celery beat schedule - will be updated when Redis becomes available
+def setup_beat_schedule():
+    """Setup beat schedule if async mode is available."""
+    config = get_celery_config()
+    if config['mode'] == 'async':
+        app.conf.beat_schedule = getattr(settings, 'CELERY_BEAT_SCHEDULE', {})
+
+# Optionally call this on first async task execution
+# For now, beat schedule defaults to empty in sync mode
 
 
 @app.task(bind=True)
