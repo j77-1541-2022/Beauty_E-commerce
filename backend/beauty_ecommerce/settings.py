@@ -26,10 +26,10 @@ DEBUG = _parse_debug_value(config('DEBUG', default='True'))
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'testserver']
 
-# Add Railway domains
+# Add Railway domains (leading dot matches any subdomain)
 ALLOWED_HOSTS.extend([
     '.railway.app',
-    '*.up.railway.app',
+    '.up.railway.app',
     'beautye-commerce-production.up.railway.app',
 ])
 
@@ -87,8 +87,8 @@ MIDDLEWARE = [
 
 # Section G5 - Production Security Settings
 CSRF_TRUSTED_ORIGINS = [
-    'https://*.railway.app',
-    'https://*.up.railway.app',
+    'https://.railway.app',
+    'https://.up.railway.app',
     'https://beautye-commerce-production.up.railway.app',
 ]
 
